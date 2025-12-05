@@ -169,3 +169,15 @@ The script wraps `rpmbuild`, autogenerates a spec file, and drops the finished R
 - State reporting endpoint so a controller can fan out work to remote agents.
 - Unit tests around the package and file operations.
 - Support for templated file content (Jinja) and richer package providers (pip, npm, etc.).
+### Configuration
+
+ForgeOps reads `/etc/forgeops/main.conf` (TOML) for defaults. Example:
+
+```
+[defaults]
+plan = "/etc/forgeops/plan.fops"
+state_file = "/var/lib/forgeops/state.json"
+template_dir = "/etc/forgeops/templates"
+```
+
+Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from .config import load_config
 from .inventory import InventoryLoader
 from .runner import TaskRunner
 from .state import StateStore
@@ -33,14 +34,20 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "plan",
         nargs="?",
-        default=Path("/etc/forgeops/plan.fops"),
+        default=None,
         type=Path,
-        help="Path to a plan file (default: /etc/forgeops/plan.fops)",
+        help="Path to a plan file (default from config or /etc/forgeops/plan.fops)",
     )
     parser.add_argument(
         "--state-file",
         type=Path,
         help="Location for plan state (default: plan + .state.json)",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("/etc/forgeops/main.conf"),
+        help="Path to forgeops config file (default: /etc/forgeops/main.conf)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Calculate changes without executing")
     parser.add_argument(
@@ -62,13 +69,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     configure_logging(args.log_level)
 
-    plan_path = args.plan
+    cfg = load_config(args.config)
+    plan_path = args.plan or cfg.plan
     loader = InventoryLoader()
     plan = loader.load(plan_path)
 
-    if args.state_file:
-        state_path = args.state_file
-    else:
+    state_path = args.state_file or cfg.state_file
+    if not state_path:
         state_path = plan_path.with_name(plan_path.name + ".state.json")
 
     state_store = None if args.dry_run else StateStore(state_path)

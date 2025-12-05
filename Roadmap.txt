@@ -19,3 +19,5 @@ Instead of printing a stack trace, If something is added to the plan.fpos that h
 In the output, print the name of the resource , for example  local::user someuser - ok - noop
 
 Configuration - Add an /etc/forgeops/main.conf so that users can define default directories, state file locations, etc...
+
+Includes - Plans should be able to get separated into separate files and have the option to get "included" into other plan files. 
