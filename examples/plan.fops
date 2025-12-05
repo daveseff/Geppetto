@@ -13,6 +13,16 @@ task 'bootstrap' on ['local'] {
     state   => running
   }
 
+  user { 'forgeops':
+    shell  => '/bin/bash'
+    locked => true
+  }
+
+  authorized_key { 'forgeops-admin':
+    user => 'forgeops'
+    key  => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCexample forgeops'
+  }
+
   file { '/tmp/forgeops-motd':
     ensure  => present
     mode    => '0644'
