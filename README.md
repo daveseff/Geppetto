@@ -48,6 +48,17 @@ task 'bootstrap' on ['local'] {
     key  => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCexample forgeops'
   }
 
+  remote_file { 'bootstrap-script':
+    source => 's3://forgeops-artifacts/bootstrap.sh'
+    dest   => '/usr/local/bin/bootstrap.sh'
+    mode   => '0755'
+  }
+
+  rpm { 'amazon-ssm-agent':
+    name   => 'amazon-ssm-agent'
+    source => 'https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm'
+  }
+
   file { '/tmp/motd':
     ensure  => present
     mode    => '0644'
@@ -56,7 +67,33 @@ task 'bootstrap' on ['local'] {
 }
 ```
 
-Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes: the referenced file (relative or absolute path) is rendered via Python's `string.Template` using host variables (from the `node` definition) plus any per-resource `variables` (available in TOML plans). Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. Service resources map onto `systemctl`, user resources wrap `useradd/usermod/userdel`, and `authorized_key` resources keep SSH keys idempotent (with automatic base64 decoding). If the loader detects a `.fops` extension (or the DSL syntax), it automatically uses the DSL parser; `.toml` continues to be supported for existing plans.
+Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `block_device`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes: the referenced file (relative or absolute path) is rendered via Python's `string.Template` using host variables (from the `node` definition) plus any per-resource `variables` (available in TOML plans). Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. Service resources map onto `systemctl`, user resources wrap `useradd/usermod/userdel`, `authorized_key` resources keep SSH keys idempotent (with automatic base64 decoding), filesystem operations manage `/etc/fstab` entries plus `mount`/`umount` steps for both EFS and block devices, `remote_file` fetches artifacts from local paths/S3/HTTP, and `rpm` downloads + installs RPMs when they aren’t already present.
+
+An EFS mount example:
+
+```
+efs_mount { 'logs':
+  filesystem_id => 'fs-abc123'
+  mount_point   => '/mnt/logs'
+  mount_options => ['tls', '_netdev']
+}
+```
+
+And a block device formatted and mounted by UUID:
+
+```
+block_device { 'data':
+  volume_id   => 'vol-0abc123'
+  device_name => 'xvdf'
+  mount_point => '/srv/data'
+  filesystem  => 'xfs'
+  mkfs        => true
+}
+```
+
+Block-device mounts accept either a direct `/dev/...` path or a `volume_id`/`device_name` pair; the runner waits for the attachment to appear (checking AWS-style `/dev/disk/by-id` aliases) before formatting and mounting it, which keeps the same robustness as the original shell helper.
+
+If the loader detects a `.fops` extension (or the DSL syntax), it automatically uses the DSL parser; `.toml` continues to be supported for existing plans.
 
 ## Usage
 
