@@ -1,0 +1,64 @@
+from pathlib import Path
+import textwrap
+
+import pytest
+
+from forgeops_automation.inventory import InventoryLoader
+
+
+def test_loads_default_local_host(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.toml"
+    plan_path.write_text(
+        textwrap.dedent(
+            """
+            [[tasks]]
+            name = "basic"
+
+              [[tasks.actions]]
+              type = "file"
+              path = "/tmp/demo"
+            """
+        ).strip()
+    )
+
+    plan = InventoryLoader().load(plan_path)
+
+    assert set(plan.hosts) == {"local"}
+    assert plan.tasks[0].hosts == ["local"]
+    assert plan.tasks[0].actions[0].type == "file"
+
+
+def test_missing_action_type_raises(tmp_path: Path) -> None:
+    plan_path = tmp_path / "bad.toml"
+    plan_path.write_text(
+        textwrap.dedent(
+            """
+            [[tasks]]
+            name = "broken"
+
+              [[tasks.actions]]
+              path = "/tmp/demo"
+            """
+        ).strip()
+    )
+
+    loader = InventoryLoader()
+    with pytest.raises(ValueError):
+        loader.load(plan_path)
+
+
+def test_loader_accepts_dsl(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.fops"
+    plan_path.write_text(
+        """
+        task 'demo' on 'local' {
+          package { 'git':
+            ensure => present
+          }
+        }
+        """.strip()
+    )
+
+    plan = InventoryLoader().load(plan_path)
+    assert plan.tasks[0].actions[0].type == "package"
+    assert plan.tasks[0].actions[0].data["name"] == "git"

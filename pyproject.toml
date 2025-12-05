@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "forgeops-automation"
+version = "0.1.0"
+description = "Lightweight systems automation toolkit for ForgeOps"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{name = "Dave Seff", email = "dave@seff.com.au"}]
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+forgeops-auto = "forgeops_automation.cli:main"

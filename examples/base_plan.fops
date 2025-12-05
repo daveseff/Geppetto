@@ -1,0 +1,21 @@
+node 'local' {
+  connection => local
+}
+
+task 'bootstrap' on ['local'] {
+  package { ['git', 'python3']:
+    ensure => present
+  }
+
+  file { '/tmp/forgeops-motd':
+    ensure  => present
+    mode    => '0644'
+    content => "Managed by ForgeOps automation\n"
+  }
+}
+
+task 'cleanup' on 'local' {
+  file { '/tmp/obsolete.txt':
+    ensure => absent
+  }
+}
