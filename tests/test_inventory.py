@@ -84,3 +84,22 @@ def test_plan_dir_attached(tmp_path: Path) -> None:
     plan = InventoryLoader().load(plan_path)
     action = plan.tasks[0].actions[0]
     assert action.data["_plan_dir"] == str(tmp_path)
+
+
+def test_dsl_include(tmp_path: Path) -> None:
+    sub = tmp_path / "sub.fops"
+    sub.write_text(
+        """
+        task 'included' on 'local' {
+          package { 'htop':
+            ensure => present
+          }
+        }
+        """.strip()
+    )
+    main = tmp_path / "main.fops"
+    main.write_text(f"include '{sub.name}'\n")
+
+    plan = InventoryLoader().load(main)
+    assert plan.tasks[0].name == "included"
+    assert plan.tasks[0].actions[0].data["name"] == "htop"

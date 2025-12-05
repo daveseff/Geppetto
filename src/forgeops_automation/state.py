@@ -45,12 +45,19 @@ class StateStore:
         self.previous = self._load()
         self.current: dict[str, dict[str, dict[str, Any]]] = {}
 
-    def record(self, host: str, action_type: str, spec: dict[str, Any]) -> None:
-        if action_type not in DESTROY_BUILDERS:
+    def record(self, host: str, action) -> None:
+        if action.type not in DESTROY_BUILDERS:
             return
-        key = self._make_key(action_type, spec)
-        normalized = _normalize_value(spec)
-        self.current.setdefault(host, {})[key] = {"action": action_type, "spec": normalized}
+        spec = _normalize_value(action.data)
+        resource_id = spec.get("_resource_id")
+        key = resource_id or self._make_key(action.type, spec)
+        entry = {
+            "action": action.type,
+            "spec": spec,
+            "resource_id": resource_id,
+            "depends_on": list(action.depends_on),
+        }
+        self.current.setdefault(host, {})[key] = entry
 
     def finalize(self, plan, executor_factory) -> None:
         for host_name, entries in list(self.previous.items()):
@@ -58,9 +65,11 @@ class StateStore:
             if not host:
                 logger.debug("Skipping cleanup for unknown host %s", host_name)
                 continue
-            for key, entry in list(entries.items()):
+            ordered_keys = self._order_entries(entries, reverse=True)
+            for key in ordered_keys:
                 if key in self.current.get(host_name, {}):
                     continue
+                entry = entries[key]
                 self._destroy_entry(host, entry, executor_factory)
         self._write()
 
@@ -100,3 +109,35 @@ class StateStore:
         normalized = _normalize_value(spec)
         payload = json.dumps({"action": action_type, "spec": normalized}, sort_keys=True)
         return payload
+
+    def _order_entries(self, entries: dict[str, dict[str, Any]], reverse: bool = False) -> list[str]:
+        if not entries:
+            return []
+        id_to_key: dict[str, str] = {}
+        for key, entry in entries.items():
+            rid = entry.get("resource_id") or key
+            id_to_key[rid] = key
+
+        deps_map: dict[str, set[str]] = {}
+        in_degree: dict[str, int] = {}
+        for key, entry in entries.items():
+            rid = entry.get("resource_id") or key
+            deps = {dep for dep in entry.get("depends_on", []) if dep in id_to_key}
+            deps_map[rid] = deps
+            in_degree[rid] = len(deps)
+        queue = [rid for rid, deg in in_degree.items() if deg == 0]
+        ordered: list[str] = []
+        while queue:
+            current = queue.pop(0)
+            ordered.append(current)
+            for node, deps in deps_map.items():
+                if current in deps:
+                    in_degree[node] -= 1
+                    if in_degree[node] == 0:
+                        queue.append(node)
+        for rid in deps_map:
+            if rid not in ordered:
+                ordered.append(rid)
+        if reverse:
+            ordered.reverse()
+        return [id_to_key.get(rid, rid) for rid in ordered]

@@ -18,6 +18,7 @@ class Ansi:
     GREEN = "\033[92m"
     RED = "\033[91m"
     BLUE = "\033[94m"
+    ORANGE = "\033[38;5;208m"
     RESET = "\033[0m"
 
 
@@ -93,15 +94,20 @@ def format_result(result: ActionResult) -> str:
     status = "changed" if result.changed else "ok"
     color: str | None = None
     if result.failed:
-        status = "failed"
-        color = Ansi.RED
+        if "unknown operation" in result.details.lower():
+            status = "unknown"
+            color = Ansi.ORANGE
+        else:
+            status = "failed"
+            color = Ansi.RED
     elif result.changed:
         color = Ansi.GREEN
     elif "noop" in result.details.lower():
         color = Ansi.BLUE
     else:
         color = Ansi.BLUE
-    line = f"{result.host}::{result.action} {status} - {result.details}"
+    resource = f"[{result.resource}]" if result.resource else ""
+    line = f"{result.host}::{result.action}{resource} {status} - {result.details}"
     return colorize(line, color)
 
 

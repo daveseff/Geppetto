@@ -14,10 +14,10 @@
 
 [x] Keep a statefile on the host, similar to how terraform keeps state, so that removing an item from the plan removes/undoes the action.
 
-Instead of printing a stack trace, If something is added to the plan.fpos that hasn't been implemented yet then print an 'unknown operation' in orange. 
+[x] Instead of printing a stack trace, If something is added to the plan.fpos that hasn't been implemented yet then print an 'unknown operation' in orange. 
 
-In the output, print the name of the resource , for example  local::user someuser - ok - noop
+[x] In the output, print the name of the resource , for example  local::user someuser - ok - noop
 
-Configuration - Add an /etc/forgeops/main.conf so that users can define default directories, state file locations, etc...
+[x] Configuration - Add an /etc/forgeops/main.conf so that users can define default directories, state file locations, etc...
 
-Includes - Plans should be able to get separated into separate files and have the option to get "included" into other plan files. 
+[x] Includes - Plans should be able to get separated into separate files and have the option to get "included" into other plan files. 

@@ -179,12 +179,18 @@ class DSLParser:
             data["name"] = str(title)
             if resource_type == "file":
                 data.setdefault("path", data["name"])
+        depends_on: list[str] = []
         for key, value in attrs.items():
             if key == "ensure":
                 data.setdefault("state", value)
+            elif key == "depends_on":
+                if isinstance(value, list):
+                    depends_on.extend(str(v) for v in value)
+                else:
+                    depends_on.append(str(value))
             else:
                 data[key] = value
-        return ActionSpec(type=resource_type, data=data)
+        return ActionSpec(type=resource_type, data=data, depends_on=depends_on)
 
     def _parse_host_list(self) -> list[str]:
         if self._match("LBRACKET"):

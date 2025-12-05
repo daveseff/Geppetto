@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import re
 import tomllib
 
 from .dsl import DSLParseError, DSLParser
@@ -10,6 +11,8 @@ from .types import ActionSpec, HostConfig, Plan, TaskSpec
 
 class InventoryLoader:
     """Loads plan definitions from TOML files."""
+
+    INCLUDE_RE = re.compile(r"^include\s+['\"]([^'\"]+)['\"]\s*$")
 
     def load(self, path: Path) -> Plan:
         path = Path(path)
@@ -20,7 +23,8 @@ class InventoryLoader:
             self._attach_plan_dir(plan, base_dir)
             return plan
         if suffix in {".fops", ".pp"}:
-            plan = DSLParser().parse_file(path)
+            text = self._read_with_includes(path)
+            plan = DSLParser().parse_text(text)
             self._attach_plan_dir(plan, base_dir)
             return plan
 
@@ -70,8 +74,13 @@ class InventoryLoader:
         action_type = action.get("type")
         if not action_type:
             raise ValueError(f"Task {task_index} action {action_index} is missing a type")
-        data = {k: v for k, v in action.items() if k != "type"}
-        return ActionSpec(type=action_type, data=data)
+        depends = action.get("depends_on", [])
+        if isinstance(depends, str):
+            depends_list = [depends]
+        else:
+            depends_list = list(depends or [])
+        data = {k: v for k, v in action.items() if k not in {"type", "depends_on"}}
+        return ActionSpec(type=action_type, data=data, depends_on=depends_list)
 
     @staticmethod
     def _attach_plan_dir(plan: Plan, base_dir: Path) -> None:
@@ -79,3 +88,20 @@ class InventoryLoader:
         for task in plan.tasks:
             for action in task.actions:
                 action.data.setdefault("_plan_dir", base)
+
+    def _read_with_includes(self, path: Path, seen: set[Path] | None = None) -> str:
+        seen = seen or set()
+        real = path.resolve()
+        if real in seen:
+            raise ValueError(f"Recursive include detected for {path}")
+        seen.add(real)
+        lines: list[str] = []
+        for line in path.read_text().splitlines():
+            stripped = line.strip()
+            match = self.INCLUDE_RE.match(stripped)
+            if match:
+                include_path = (path.parent / match.group(1)).resolve()
+                lines.append(self._read_with_includes(include_path, seen))
+            else:
+                lines.append(line)
+        return "\n".join(lines)

@@ -16,6 +16,7 @@ class HostConfig:
 class ActionSpec:
     type: str
     data: dict[str, Any]
+    depends_on: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -38,3 +39,4 @@ class ActionResult:
     changed: bool
     details: str
     failed: bool = False
+    resource: str | None = None
