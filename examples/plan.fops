@@ -1,39 +1,9 @@
-node 'local' {
+node 'jumpbox' {
   connection  => local
-  environment => 'local'
+  environment => 'staging'
 }
 
-task 'bootstrap' on ['local'] {
-  package { ['git',]:
-    ensure => present
-  }
-
-  service { 'sshd':
-    enabled => true
-    state   => running
-  }
-
-  user { 'forgeops':
-    shell  => '/bin/bash'
-    locked => true
-  }
-
-  authorized_key { 'forgeops-admin':
-    user => 'forgeops'
-    depends_on => ['user.forgeops']
-    key  => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCexample forgeops'
-  }
-
-  file { '/tmp/forgeops-motd':
-    ensure  => present
-    mode    => '0644'
-    template => 'examples/templates/motd.tmpl'
-  }
-
-}
-
-task 'cleanup' on 'local' {
-  file { '/tmp/obsolete.txt':
-    ensure => absent
-  }
-}
+include 'includes/packages.fops'
+include 'includes/mounts.fops'
+include 'includes/users.fops'
+include 'includes/keys.fops'

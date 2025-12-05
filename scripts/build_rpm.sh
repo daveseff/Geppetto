@@ -119,11 +119,21 @@ tarball="$WORKDIR/SOURCES/${NAME}-${VERSION}.tar.gz"
 tar -C "$stage_dir" -czf "$tarball" "${NAME}-${VERSION}"
 
 filelist="$WORKDIR/SOURCES/${NAME}.files"
+IGNORED_DIRS=("usr" "usr/bin" "usr/lib")
 (
   cd "$PAYLOAD_DIR"
   find . -type d | sort | while read -r d; do
     [[ "$d" == "." ]] && continue
-    printf '%%dir /%s\n' "${d#./}"
+    rel="${d#./}"
+    skip=false
+    for ignored in "${IGNORED_DIRS[@]}"; do
+      if [[ "$rel" == "$ignored" ]]; then
+        skip=true
+        break
+      fi
+    done
+    $skip && continue
+    printf '%%dir /%s\n' "$rel"
   done
   find . \( -type f -o -type l \) | sort | while read -r f; do
     printf '/%s\n' "${f#./}"

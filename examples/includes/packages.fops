@@ -1,0 +1,17 @@
+task 'jumpbox-packages' on ['jumpbox'] {
+  package { [
+      'awscli',
+      'jq',
+      'rsync',
+      'chrony',
+      'cronie',
+      'sendmail',
+      'mlocate',
+      'libnsl',
+      'java-11-amazon-corretto-devel',
+      'unzip',
+      'amazon-efs-utils',
+    ]:
+    ensure => present
+  }
+}

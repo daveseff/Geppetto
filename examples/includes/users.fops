@@ -1,0 +1,8 @@
+task 'jumpbox-users' on ['jumpbox'] {
+  user { 'forgeops':
+    shell    => '/bin/bash'
+    locked   => true
+    system   => false
+    comment  => 'ForgeOps service user'
+  }
+}

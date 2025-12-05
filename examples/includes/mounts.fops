@@ -1,0 +1,13 @@
+task 'jumpbox-mounts' on ['jumpbox'] {
+  efs_mount { 'logs':
+    filesystem_id => 'fs-logs'
+    mount_point   => '/logs'
+    mount_options => ['tls', '_netdev']
+  }
+
+  efs_mount { 'configuration':
+    filesystem_id => 'fs-configs'
+    mount_point   => '/configs'
+    mount_options => ['tls', '_netdev']
+  }
+}
