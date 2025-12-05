@@ -14,19 +14,26 @@ class InventoryLoader:
     def load(self, path: Path) -> Plan:
         path = Path(path)
         suffix = path.suffix.lower()
+        base_dir = path.parent
         if suffix == ".toml":
-            return self._load_toml(path)
+            plan = self._load_toml(path)
+            self._attach_plan_dir(plan, base_dir)
+            return plan
         if suffix in {".fops", ".pp"}:
-            return DSLParser().parse_file(path)
+            plan = DSLParser().parse_file(path)
+            self._attach_plan_dir(plan, base_dir)
+            return plan
 
         text = path.read_text()
         try:
-            return DSLParser().parse_text(text)
+            plan = DSLParser().parse_text(text)
         except DSLParseError:
             data = tomllib.loads(text)
             hosts = self._parse_hosts(data.get("hosts", {}))
             tasks = self._parse_tasks(data.get("tasks", []), hosts)
-            return Plan(hosts=hosts, tasks=tasks)
+            plan = Plan(hosts=hosts, tasks=tasks)
+        self._attach_plan_dir(plan, base_dir)
+        return plan
 
     def _load_toml(self, path: Path) -> Plan:
         data = tomllib.loads(path.read_text())
@@ -65,3 +72,10 @@ class InventoryLoader:
             raise ValueError(f"Task {task_index} action {action_index} is missing a type")
         data = {k: v for k, v in action.items() if k != "type"}
         return ActionSpec(type=action_type, data=data)
+
+    @staticmethod
+    def _attach_plan_dir(plan: Plan, base_dir: Path) -> None:
+        base = str(base_dir)
+        for task in plan.tasks:
+            for action in task.actions:
+                action.data.setdefault("_plan_dir", base)

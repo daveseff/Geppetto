@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from string import Template
 
 from .base import Operation
 from ..executors import Executor
@@ -19,17 +20,41 @@ class FileOperation(Operation):
         self.state = str(spec.get("state", "present"))
         if self.state not in {"present", "absent"}:
             raise ValueError("file operation state must be 'present' or 'absent'")
-        self.content = str(spec.get("content", ""))
+        raw_content = spec.get("content")
+        self.content = "" if raw_content is None else str(raw_content)
         self.mode = self._parse_mode(spec.get("mode"))
+        self.template = spec.get("template")
+        self.variables = spec.get("variables", {})
+        self.plan_dir = spec.get("_plan_dir")
+        if self.template is not None:
+            self.template = str(self.template)
+        if not isinstance(self.variables, dict):
+            raise ValueError("file operation variables must be a mapping")
+        if self.plan_dir is not None:
+            self.plan_dir = Path(str(self.plan_dir))
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         if self.state == "present":
-            changed, detail = executor.write_file(self.path, content=self.content, mode=self.mode)
+            content = self._render_content(host)
+            changed, detail = executor.write_file(self.path, content=content, mode=self.mode)
         else:
             removed = executor.remove_path(self.path)
             detail = "removed" if removed else "noop"
             changed = removed
         return ActionResult(host=host.name, action="file", changed=changed, details=detail)
+
+    def _render_content(self, host: HostConfig) -> str:
+        if not self.template:
+            return self.content
+        template_path = Path(self.template).expanduser()
+        if not template_path.is_absolute() and self.plan_dir is not None:
+            template_path = self.plan_dir / template_path
+        template_text = template_path.read_text()
+        context: dict[str, object] = dict(host.variables)
+        for key, value in self.variables.items():
+            context[key] = value
+        template = Template(template_text)
+        return template.safe_substitute(context)
 
     @staticmethod
     def _parse_mode(value: object | None) -> int | None:

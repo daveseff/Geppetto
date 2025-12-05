@@ -1,5 +1,6 @@
 node 'local' {
-  connection => local
+  connection  => local
+  environment => 'local'
 }
 
 task 'bootstrap' on ['local'] {
@@ -10,7 +11,7 @@ task 'bootstrap' on ['local'] {
   file { '/tmp/forgeops-motd':
     ensure  => present
     mode    => '0644'
-    content => "Managed by ForgeOps automation\n"
+    template => 'examples/templates/motd.tmpl'
   }
 }
 

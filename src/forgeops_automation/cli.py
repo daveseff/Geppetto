@@ -29,7 +29,13 @@ def colorize(text: str, color: str | None) -> str:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ForgeOps automation runner")
-    parser.add_argument("plan", type=Path, help="Path to a plan TOML file")
+    parser.add_argument(
+        "plan",
+        nargs="?",
+        default=Path("/etc/forgeops/plan.fops"),
+        type=Path,
+        help="Path to a plan file (default: /etc/forgeops/plan.fops)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Calculate changes without executing")
     parser.add_argument(
         "--log-level",

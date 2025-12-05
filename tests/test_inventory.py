@@ -62,3 +62,25 @@ def test_loader_accepts_dsl(tmp_path: Path) -> None:
     plan = InventoryLoader().load(plan_path)
     assert plan.tasks[0].actions[0].type == "package"
     assert plan.tasks[0].actions[0].data["name"] == "git"
+
+
+def test_plan_dir_attached(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.toml"
+    plan_path.write_text(
+        """
+        [hosts.local]
+        connection = "local"
+
+        [[tasks]]
+        name = "demo"
+
+          [[tasks.actions]]
+          type = "file"
+          path = "/tmp/demo"
+          template = "templates/file.tmpl"
+        """.strip()
+    )
+
+    plan = InventoryLoader().load(plan_path)
+    action = plan.tasks[0].actions[0]
+    assert action.data["_plan_dir"] == str(tmp_path)

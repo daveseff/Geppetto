@@ -36,3 +36,22 @@ def test_file_absent_removes_files(tmp_path: Path) -> None:
 
     assert result.changed is True
     assert not target.exists()
+
+
+def test_file_template_renders_host_variables(tmp_path: Path, monkeypatch) -> None:
+    template = tmp_path / "motd.tmpl"
+    template.write_text("Hello ${name} from ${env}")
+    target = tmp_path / "motd.txt"
+    spec = {
+        "path": str(target),
+        "state": "present",
+        "template": str(template),
+        "variables": {"env": "Dev"},
+    }
+    host = HostConfig(name="local", variables={"name": "ForgeOps"})
+    op = FileOperation(spec)
+
+    result = op.apply(host, build_executor())
+
+    assert result.changed is True
+    assert target.read_text() == "Hello ForgeOps from Dev"
