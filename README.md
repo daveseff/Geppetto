@@ -33,6 +33,11 @@ task 'bootstrap' on ['local'] {
     ensure => present
   }
 
+  service { 'sshd':
+    enabled => true
+    state   => running
+  }
+
   file { '/tmp/motd':
     ensure  => present
     mode    => '0644'
@@ -41,7 +46,7 @@ task 'bootstrap' on ['local'] {
 }
 ```
 
-Each resource block becomes an action (`package`, `file`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes: the referenced file (relative or absolute path) is rendered via Python's `string.Template` using host variables (from the `node` definition) plus any per-resource `variables` (available in TOML plans). Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. If the loader detects a `.fops` extension (or the DSL syntax), it automatically uses the DSL parser; `.toml` continues to be supported for existing plans.
+Each resource block becomes an action (`package`, `file`, `service`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes: the referenced file (relative or absolute path) is rendered via Python's `string.Template` using host variables (from the `node` definition) plus any per-resource `variables` (available in TOML plans). Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. Service resources map onto `systemctl`, so you can assert that a unit is enabled/disabled, running/stopped, and optionally force a restart. If the loader detects a `.fops` extension (or the DSL syntax), it automatically uses the DSL parser; `.toml` continues to be supported for existing plans.
 
 ## Usage
 

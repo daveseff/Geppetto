@@ -1,0 +1,11 @@
+[x] Service management – Blocks ensure_service at the top (roughly jumpbox_setup.sh:5-22) enable and start systemd units if needed. We should add a service operation that can assert enabled/disabled and running/stopped, so plans can replace that helper with declarative tasks.
+
+User + SSH key resources – Functions ensure_user and setup_authorized_keys (jumpbox_setup.sh:24-75) create service accounts, lock passwords, and seed authorized_keys (including base64 decoding). A ForgeOps user operation with optional ssh_authorized_keys would simplify these chunks.
+
+Remote artifact fetch/install – install_from_s3 and install_rpm_from_uri (jumpbox_setup.sh:77-122) download binaries or RPMs from S3 and install them idempotently. Adding an s3_fetch/remote_file operation plus an rpm provider that takes a URI would capture this behavior.
+
+File system mounts – configure_efs_mounts (jumpbox_setup.sh:124-200) and configure_ebs_volumes (jumpbox_setup.sh:232-345) parse JSON and then create directories, fstab entries, format devices, and mount them. We could model this with higher-level efs_mount and ebs_volume operations that accept structured plan data instead of custom shell.
+
+SSH key distribution – configure_public_keys (jumpbox_setup.sh:202-230) reads JSON and ensures keys per user. Beyond the base user resource, a dedicated authorized_key operation (similar to Ansible) would let plans append keys idempotently.
+
+Block-device detection / wait – wait_for_block_device (jumpbox_setup.sh:232-270) polls for disk attachments and handles multiple naming conventions. An operation or helper for “attach & wait” would cover this infrastructure concern, especially when combined with the EBS volume resource above.

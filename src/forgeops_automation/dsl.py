@@ -211,6 +211,11 @@ class DSLParser:
             return token.value
         if token.type == "IDENT":
             self._advance()
+            lowered = token.value.lower()
+            if lowered == "true":
+                return True
+            if lowered == "false":
+                return False
             return token.value
         if token.type == "LBRACKET":
             return self._parse_list()

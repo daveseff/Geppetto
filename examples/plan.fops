@@ -8,6 +8,11 @@ task 'bootstrap' on ['local'] {
     ensure => present
   }
 
+  service { 'sshd':
+    enabled => true
+    state   => running
+  }
+
   file { '/tmp/forgeops-motd':
     ensure  => present
     mode    => '0644'
