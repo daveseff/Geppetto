@@ -15,13 +15,12 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 ```
 pyproject.toml                 # Packaging metadata and CLI entrypoint
 src/forgeops_automation/       # Python package with runners, executors, operations, and DSL parser
-examples/base_plan.fops        # Sample Puppet-like DSL plan
-examples/base_plan.toml        # Legacy TOML plan definition
+examples/plan.fops        # Sample Puppet-like DSL plan
 ```
 
 ### Plans
 
-Plans can be expressed either as TOML (for compatibility) or via a Puppet-inspired DSL that favors structured resources. A DSL example (`examples/base_plan.fops`):
+Plans can be expressed either as TOML (for compatibility) or via a Puppet-inspired DSL that favors structured resources. A DSL example (`examples/plan.fops`):
 
 ```
 node 'local' {
@@ -68,6 +67,7 @@ task 'bootstrap' on ['local'] {
 ```
 
 include 'shared/common.fops'
+
 ```
 
 Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `block_device`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes: the referenced file (relative or absolute path) is rendered via Python's `string.Template` using host variables (from the `node` definition) plus any per-resource `variables` (available in TOML plans). Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. Service resources map onto `systemctl`, user resources wrap `useradd/usermod/userdel`, `authorized_key` resources keep SSH keys idempotent (with automatic base64 decoding), filesystem operations manage `/etc/fstab` entries plus `mount`/`umount` steps for both EFS and block devices, `remote_file` fetches artifacts from local paths/S3/HTTP, and `rpm` downloads + installs RPMs when they aren’t already present. DSL plans can also include additional files via `include 'relative/path.fops'` directives; include paths resolve relative to the parent plan. Resources can coordinate ordering by setting `depends_on => ['user.forgeops']`, ensuring dependent actions run after their prerequisites (and before them during cleanup).
@@ -75,35 +75,41 @@ Each resource block becomes an action (`package`, `file`, `service`, `user`, `au
 An EFS mount example:
 
 ```
+
 efs_mount { 'logs':
-  filesystem_id => 'fs-abc123'
-  mount_point   => '/mnt/logs'
-  mount_options => ['tls', '_netdev']
+filesystem_id => 'fs-abc123'
+mount_point => '/mnt/logs'
+mount_options => ['tls', '_netdev']
 }
+
 ```
 
 And a block device formatted and mounted by UUID:
 
 ```
+
 block_device { 'data':
-  volume_id   => 'vol-0abc123'
-  device_name => 'xvdf'
-  mount_point => '/srv/data'
-  filesystem  => 'xfs'
-  mkfs        => true
+volume_id => 'vol-0abc123'
+device_name => 'xvdf'
+mount_point => '/srv/data'
+filesystem => 'xfs'
+mkfs => true
 }
+
 ```
 
 A generic (non-EFS) network mount:
 
 ```
+
 network_mount { 'nfs-share':
-  source       => '10.0.0.5:/exports/app'
-  mount_point  => '/mnt/app'
-  fstype       => 'nfs4'
-  mount_options => ['_netdev', 'rw']
+source => '10.0.0.5:/exports/app'
+mount_point => '/mnt/app'
+fstype => 'nfs4'
+mount_options => ['_netdev', 'rw']
 }
-```
+
+````
 
 Block-device mounts accept either a direct `/dev/...` path or a `volume_id`/`device_name` pair; the runner waits for the attachment to appear (checking AWS-style `/dev/disk/by-id` aliases) before formatting and mounting it, which keeps the same robustness as the original shell helper.
 
@@ -115,7 +121,7 @@ If the loader detects a `.fops` extension (or the DSL syntax), it automatically 
 
    ```bash
    pip install -e .
-   ```
+````
 
 2. Run the CLI against a plan:
 
@@ -172,6 +178,7 @@ The script wraps `rpmbuild`, autogenerates a spec file, and drops the finished R
 - State reporting endpoint so a controller can fan out work to remote agents.
 - Unit tests around the package and file operations.
 - Support for templated file content (Jinja) and richer package providers (pip, npm, etc.).
+
 ### Configuration
 
 ForgeOps reads `/etc/forgeops/main.conf` (TOML) for defaults. Example:

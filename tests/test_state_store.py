@@ -34,6 +34,7 @@ def test_state_store_removes_deleted_files(tmp_path: Path):
 
     assert target.exists()
     assert state_path.exists()
+    assert (state_path.stat().st_mode & 0o777) == 0o600
 
     # Rewrite plan with no tasks to trigger cleanup
     plan_path.write_text("node 'local' { connection => local }\n")

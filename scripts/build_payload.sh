@@ -68,7 +68,7 @@ wrapper="$PAYLOAD_DIR/usr/bin/forgeops-auto"
 if [[ -f "$wrapper" ]]; then
   tmp=$(mktemp)
   {
-    echo "#!/usr/bin/env python3"
+    echo "#!/usr/bin/python3.13"
     tail -n +2 "$wrapper"
   } >"$tmp"
   mv "$tmp" "$wrapper"

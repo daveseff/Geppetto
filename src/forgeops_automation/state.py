@@ -4,6 +4,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Callable
+import os
 
 from .operations import OPERATION_REGISTRY
 
@@ -94,6 +95,10 @@ class StateStore:
         data = self.current
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(data, indent=2))
+        try:
+            os.chmod(self.path, 0o600)
+        except OSError:
+            logger.debug("Unable to chmod state file %s", self.path, exc_info=True)
         self.previous = data
 
     def _load(self) -> dict[str, dict[str, dict[str, Any]]]:
