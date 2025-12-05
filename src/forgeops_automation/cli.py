@@ -9,6 +9,7 @@ from typing import Sequence
 
 from .inventory import InventoryLoader
 from .runner import TaskRunner
+from .state import StateStore
 from .types import ActionResult
 
 
@@ -36,6 +37,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Path to a plan file (default: /etc/forgeops/plan.fops)",
     )
+    parser.add_argument(
+        "--state-file",
+        type=Path,
+        help="Location for plan state (default: plan + .state.json)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Calculate changes without executing")
     parser.add_argument(
         "--log-level",
@@ -56,10 +62,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     configure_logging(args.log_level)
 
+    plan_path = args.plan
     loader = InventoryLoader()
-    plan = loader.load(args.plan)
+    plan = loader.load(plan_path)
 
-    runner = TaskRunner(plan, dry_run=args.dry_run)
+    if args.state_file:
+        state_path = args.state_file
+    else:
+        state_path = plan_path.with_name(plan_path.name + ".state.json")
+
+    state_store = None if args.dry_run else StateStore(state_path)
+
+    runner = TaskRunner(plan, dry_run=args.dry_run, state_store=state_store)
     results = runner.run()
 
     for result in results:

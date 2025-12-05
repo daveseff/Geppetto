@@ -12,8 +12,10 @@
 
 [x] Block-device detection / wait – wait_for_block_device (jumpbox_setup.sh:232-270) polls for disk attachments and handles multiple naming conventions. An operation or helper for “attach & wait” would cover this infrastructure concern, especially when combined with the EBS volume resource above.
 
-Keep a statefile on the host, similar to how terraform keeps state, so that removing an item from the plan removes/undoes the action.
+[x] Keep a statefile on the host, similar to how terraform keeps state, so that removing an item from the plan removes/undoes the action.
 
 Instead of printing a stack trace, If something is added to the plan.fpos that hasn't been implemented yet then print an 'unknown operation' in orange. 
 
 In the output, print the name of the resource , for example  local::user someuser - ok - noop
+
+Configuration - Add an /etc/forgeops/main.conf so that users can define default directories, state file locations, etc...

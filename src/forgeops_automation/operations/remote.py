@@ -49,6 +49,9 @@ class RemoteFileOperation(Operation):
             raise ValueError("remote_file requires a dest/path")
         self.dest = Path(str(raw_dest))
         self.mode = self._parse_mode(spec.get("mode"))
+        self.state = str(spec.get("state", "present"))
+        if self.state not in {"present", "absent"}:
+            raise ValueError("remote_file state must be 'present' or 'absent'")
         checksum = spec.get("checksum")
         self.checksum_algo: str | None = None
         self.checksum_value: str | None = None
@@ -63,6 +66,13 @@ class RemoteFileOperation(Operation):
                 self.checksum_value = text.strip().lower()
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
+        if self.state == "absent":
+            if not self.dest.exists():
+                return ActionResult(host=host.name, action="remote_file", changed=False, details="noop")
+            if not executor.dry_run:
+                self.dest.unlink()
+            return ActionResult(host=host.name, action="remote_file", changed=True, details="removed")
+
         fetcher = RemoteFetcher(executor)
         tmp = fetcher.fetch(str(self.source))
         try:
@@ -111,10 +121,21 @@ class RpmInstallOperation(Operation):
             raise ValueError("rpm operation requires a source")
         self.source = str(raw_source)
         self.allow_downgrade = bool(spec.get("allow_downgrade", False))
+        self.state = str(spec.get("state", "present"))
+        if self.state not in {"present", "absent"}:
+            raise ValueError("rpm state must be 'present' or 'absent'")
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         query = executor.run(["rpm", "-q", self.name], check=False, mutable=False)
-        if query.returncode == 0:
+        installed = query.returncode == 0
+
+        if self.state == "absent":
+            if not installed:
+                return ActionResult(host=host.name, action="rpm", changed=False, details="noop")
+            executor.run(["rpm", "-e", self.name])
+            return ActionResult(host=host.name, action="rpm", changed=True, details="removed")
+
+        if installed:
             return ActionResult(host=host.name, action="rpm", changed=False, details="already-installed")
 
         fetcher = RemoteFetcher(executor)

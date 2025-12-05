@@ -12,14 +12,17 @@ logger = logging.getLogger(__name__)
 class TaskRunner:
     """Coordinates the execution of automation tasks."""
 
-    def __init__(self, plan: Plan, *, dry_run: bool = False):
+    def __init__(self, plan: Plan, *, dry_run: bool = False, state_store=None):
         self.plan = plan
         self.dry_run = dry_run
+        self.state_store = state_store
 
     def run(self) -> list[ActionResult]:
         results: list[ActionResult] = []
         for task in self.plan.tasks:
             results.extend(self._run_task(task))
+        if self.state_store and not self.dry_run:
+            self.state_store.finalize(self.plan, self._executor_for)
         return results
 
     def _run_task(self, task: TaskSpec) -> list[ActionResult]:
@@ -48,6 +51,9 @@ class TaskRunner:
                         details=str(exc),
                         failed=True,
                     )
+                else:
+                    if self.state_store and not self.dry_run:
+                        self.state_store.record(host.name, action.type, action.data)
                 logger.debug(
                     "action=%s host=%s changed=%s", action.type, host.name, result.changed
                 )

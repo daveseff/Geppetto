@@ -52,6 +52,15 @@ def test_remote_file_no_change_when_same(tmp_path: Path):
     assert result.changed is False
 
 
+def test_remote_file_absent_removes(tmp_path: Path):
+    dest = tmp_path / "output.txt"
+    dest.write_text("content")
+    op = RemoteFileOperation({"source": str(dest), "dest": str(dest), "state": "absent"})
+    result = op.apply(HostConfig("local"), RecordingExecutor())
+    assert result.changed is True
+    assert not dest.exists()
+
+
 def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):
     rpm_pkg = tmp_path / "pkg.rpm"
     rpm_pkg.write_text("rpmdata")
