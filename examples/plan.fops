@@ -28,6 +28,12 @@ task 'bootstrap' on ['local'] {
     mode    => '0644'
     template => 'examples/templates/motd.tmpl'
   }
+
+  network_mount { 'nfs-share':
+    source      => '10.0.0.5:/exports/app'
+    mount_point => '/mnt/app'
+    fstype      => 'nfs4'
+  }
 }
 
 task 'cleanup' on 'local' {

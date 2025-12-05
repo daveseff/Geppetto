@@ -9,6 +9,28 @@ from ..executors import Executor
 from ..types import ActionResult, HostConfig
 
 
+def _normalize_mount_options(options: Any, default: str) -> str:
+    if isinstance(options, str):
+        return options or default
+    if isinstance(options, (list, tuple, set)):
+        return ",".join(str(opt) for opt in options)
+    return str(options)
+
+
+def _coerce_bool(value: Any | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "yes", "1", "on"}:
+            return True
+        if lowered in {"false", "no", "0", "off"}:
+            return False
+    return bool(value)
+
+
 class FstabManager:
     def __init__(self, path: Path):
         self.path = path
@@ -84,54 +106,34 @@ class MountMixin:
         executor.run(["umount", mount_point])
 
 
-class EfsMountOperation(Operation, MountMixin):
-    """Ensure an EFS filesystem is mounted via /etc/fstab."""
+class NetworkMountOperation(Operation, MountMixin):
+    """Ensure a generic network filesystem is mounted via /etc/fstab."""
 
     def __init__(self, spec: dict[str, Any]):
         super().__init__(spec)
-        self.filesystem_id = str(spec.get("filesystem_id")) if spec.get("filesystem_id") else None
-        if not self.filesystem_id:
-            raise ValueError("efs_mount requires a filesystem_id")
+        raw_source = spec.get("source")
+        if not raw_source:
+            raise ValueError("network_mount requires a source")
+        self.source = str(raw_source)
         raw_mount = spec.get("mount_point")
         if not raw_mount:
-            raise ValueError("efs_mount requires a mount_point")
+            raise ValueError("network_mount requires a mount_point")
         self.mount_point = str(raw_mount)
         if not self.mount_point.startswith("/"):
             raise ValueError("mount_point must be absolute")
-        self.options = self._normalize_options(spec.get("mount_options", "tls,_netdev"))
+        self.fstype = str(spec.get("fstype", spec.get("filesystem", "nfs")))
+        self.options = _normalize_mount_options(spec.get("mount_options", spec.get("options", "defaults")), "defaults")
         self.state = str(spec.get("state", "present"))
         if self.state not in {"present", "absent"}:
-            raise ValueError("efs_mount state must be 'present' or 'absent'")
-        self.ensure_mounted = bool(self._to_bool(spec.get("mount", True)))
+            raise ValueError("network_mount state must be 'present' or 'absent'")
+        self.ensure_mounted = bool(_coerce_bool(spec.get("mount", True), True))
         self.fstab_path = Path(spec.get("fstab", "/etc/fstab"))
-
-    @staticmethod
-    def _normalize_options(options: Any) -> str:
-        if isinstance(options, str):
-            return options or "defaults"
-        if isinstance(options, (list, tuple, set)):
-            return ",".join(str(opt) for opt in options)
-        return str(options)
-
-    @staticmethod
-    def _to_bool(value: Any | None) -> bool:
-        if value is None:
-            return False
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, str):
-            lowered = value.strip().lower()
-            if lowered in {"true", "yes", "1", "on"}:
-                return True
-            if lowered in {"false", "no", "0", "off"}:
-                return False
-        return bool(value)
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         mount_dir = Path(self.mount_point)
         fstab = FstabManager(self.fstab_path)
         changes: list[str] = []
-        record = f"{self.filesystem_id}:/ {self.mount_point} efs {self.options} 0 0"
+        record = f"{self.source} {self.mount_point} {self.fstype} {self.options} 0 0"
 
         if self.state == "present":
             if not mount_dir.exists():
@@ -149,7 +151,21 @@ class EfsMountOperation(Operation, MountMixin):
                 changes.append("unmounted")
 
         detail = ", ".join(changes) if changes else "noop"
-        return ActionResult(host=host.name, action="efs_mount", changed=bool(changes), details=detail)
+        return ActionResult(host=host.name, action="network_mount", changed=bool(changes), details=detail)
+
+
+class EfsMountOperation(NetworkMountOperation):
+    """Wrapper around network mounts that derives the EFS source."""
+
+    def __init__(self, spec: dict[str, Any]):
+        filesystem_id = spec.get("filesystem_id")
+        if not filesystem_id:
+            raise ValueError("efs_mount requires a filesystem_id")
+        derived = dict(spec)
+        derived.setdefault("source", f"{filesystem_id}:/")
+        derived.setdefault("fstype", "efs")
+        derived.setdefault("mount_options", spec.get("mount_options", "tls,_netdev"))
+        super().__init__(derived)
 
 
 class BlockDeviceMountOperation(Operation, MountMixin):
@@ -166,12 +182,12 @@ class BlockDeviceMountOperation(Operation, MountMixin):
         if not self.mount_point.startswith("/"):
             raise ValueError("mount_point must be absolute")
         self.filesystem = str(spec.get("filesystem", "xfs"))
-        self.options = EfsMountOperation._normalize_options(spec.get("mount_options", "defaults"))
+        self.options = _normalize_mount_options(spec.get("mount_options", "defaults"), "defaults")
         self.state = str(spec.get("state", "present"))
         if self.state not in {"present", "absent"}:
             raise ValueError("block_device state must be 'present' or 'absent'")
-        self.mkfs = bool(EfsMountOperation._to_bool(spec.get("mkfs", True)))
-        self.ensure_mounted = bool(EfsMountOperation._to_bool(spec.get("mount", True)))
+        self.mkfs = bool(_coerce_bool(spec.get("mkfs", True), True))
+        self.ensure_mounted = bool(_coerce_bool(spec.get("mount", True), True))
         self.fstab_path = Path(spec.get("fstab", "/etc/fstab"))
         self.volume_id = spec.get("volume_id")
         self.device_hint = spec.get("device_name")

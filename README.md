@@ -91,6 +91,17 @@ block_device { 'data':
 }
 ```
 
+A generic (non-EFS) network mount:
+
+```
+network_mount { 'nfs-share':
+  source       => '10.0.0.5:/exports/app'
+  mount_point  => '/mnt/app'
+  fstype       => 'nfs4'
+  mount_options => ['_netdev', 'rw']
+}
+```
+
 Block-device mounts accept either a direct `/dev/...` path or a `volume_id`/`device_name` pair; the runner waits for the attachment to appear (checking AWS-style `/dev/disk/by-id` aliases) before formatting and mounting it, which keeps the same robustness as the original shell helper.
 
 If the loader detects a `.fops` extension (or the DSL syntax), it automatically uses the DSL parser; `.toml` continues to be supported for existing plans.

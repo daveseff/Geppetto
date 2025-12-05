@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from forgeops_automation.executors import CommandResult, Executor
-from forgeops_automation.operations.mount import BlockDeviceMountOperation, EfsMountOperation
+from forgeops_automation.operations.mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
 from forgeops_automation.types import HostConfig
 
 
@@ -122,3 +122,26 @@ def test_block_device_resolves_volume_id(tmp_path: Path, monkeypatch):
     assert result.changed is True
     assert ("mount", str(mount_dir)) in executor.commands
     assert f"UUID=aaaa-bbbb {mount_dir} xfs defaults 0 2" in fstab.read_text()
+
+
+def test_network_mount_handles_custom_source(tmp_path: Path):
+    fstab = tmp_path / "fstab"
+    mount_dir = tmp_path / "mnt" / "nfs"
+    responses = {
+        ("mountpoint", "-q", str(mount_dir)): [CommandResult(["mountpoint"], "", "", 1)],
+    }
+    executor = FakeExecutor(responses)
+    op = NetworkMountOperation(
+        {
+            "source": "10.0.0.5:/exports/app",
+            "mount_point": str(mount_dir),
+            "fstype": "nfs4",
+            "mount_options": ["_netdev", "rw"],
+            "fstab": str(fstab),
+        }
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert f"10.0.0.5:/exports/app {mount_dir} nfs4 _netdev,rw 0 0" in fstab.read_text()

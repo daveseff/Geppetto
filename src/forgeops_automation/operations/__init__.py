@@ -1,7 +1,7 @@
 from .authorized_key import AuthorizedKeyOperation
 from .base import Operation
 from .file import FileOperation
-from .mount import BlockDeviceMountOperation, EfsMountOperation
+from .mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
 from .package import PackageOperation
 from .remote import RemoteFileOperation, RpmInstallOperation
 from .service import ServiceOperation
@@ -15,6 +15,7 @@ OPERATION_REGISTRY = {
     "authorized_key": AuthorizedKeyOperation,
     "efs_mount": EfsMountOperation,
     "block_device": BlockDeviceMountOperation,
+    "network_mount": NetworkMountOperation,
     "remote_file": RemoteFileOperation,
     "rpm": RpmInstallOperation,
 }
@@ -28,6 +29,7 @@ __all__ = [
     "AuthorizedKeyOperation",
     "EfsMountOperation",
     "BlockDeviceMountOperation",
+    "NetworkMountOperation",
     "RemoteFileOperation",
     "RpmInstallOperation",
     "OPERATION_REGISTRY",
