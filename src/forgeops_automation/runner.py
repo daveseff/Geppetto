@@ -24,7 +24,7 @@ class TaskRunner:
 
     def _run_task(self, task: TaskSpec) -> list[ActionResult]:
         results: list[ActionResult] = []
-        logger.info("task=%s hosts=%s", task.name, ",".join(task.hosts))
+        logger.debug("task=%s hosts=%s", task.name, ",".join(task.hosts))
         for host_name in task.hosts:
             host = self.plan.hosts.get(host_name)
             if not host:
@@ -35,8 +35,20 @@ class TaskRunner:
                 if not operation_cls:
                     raise KeyError(f"Operation '{action.type}' is not registered")
                 operation: Operation = operation_cls(action.data)
-                result = operation.apply(host, executor)
-                logger.info(
+                try:
+                    result = operation.apply(host, executor)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "action=%s host=%s failed: %s", action.type, host.name, exc, exc_info=True
+                    )
+                    result = ActionResult(
+                        host=host.name,
+                        action=action.type,
+                        changed=False,
+                        details=str(exc),
+                        failed=True,
+                    )
+                logger.debug(
                     "action=%s host=%s changed=%s", action.type, host.name, result.changed
                 )
                 results.append(result)

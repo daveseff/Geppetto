@@ -2,11 +2,29 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Sequence
 
 from .inventory import InventoryLoader
 from .runner import TaskRunner
+from .types import ActionResult
+
+
+class Ansi:
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    BLUE = "\033[94m"
+    RESET = "\033[0m"
+
+
+def colorize(text: str, color: str | None) -> str:
+    if not color:
+        return text
+    if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
+        return text
+    return f"{color}{text}{Ansi.RESET}"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -39,10 +57,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     results = runner.run()
 
     for result in results:
-        status = "changed" if result.changed else "ok"
-        print(f"{result.host}::{result.action} {status} - {result.details}")
+        print(format_result(result))
 
     return 0
+
+
+def format_result(result: ActionResult) -> str:
+    status = "changed" if result.changed else "ok"
+    color: str | None = None
+    if result.failed:
+        status = "failed"
+        color = Ansi.RED
+    elif result.changed:
+        color = Ansi.GREEN
+    elif "noop" in result.details.lower():
+        color = Ansi.BLUE
+    else:
+        color = Ansi.BLUE
+    line = f"{result.host}::{result.action} {status} - {result.details}"
+    return colorize(line, color)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ node 'local' {
 }
 
 task 'bootstrap' on ['local'] {
-  package { ['git', 'python3']:
+  package { ['git',]:
     ensure => present
   }
 

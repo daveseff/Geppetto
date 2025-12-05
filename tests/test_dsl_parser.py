@@ -27,6 +27,7 @@ def test_parses_simple_plan(tmp_path: Path) -> None:
     assert plan.tasks[0].actions[0].type == "package"
     assert plan.tasks[0].actions[0].data["packages"] == ["git", "python3"]
     assert plan.tasks[0].actions[1].data["mode"] == "0644"
+    assert plan.tasks[0].actions[1].data["path"] == "/tmp/forgeops-motd"
 
 
 def test_non_package_list_title_raises() -> None:

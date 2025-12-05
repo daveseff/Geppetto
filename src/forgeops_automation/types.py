@@ -37,3 +37,4 @@ class ActionResult:
     action: str
     changed: bool
     details: str
+    failed: bool = False
