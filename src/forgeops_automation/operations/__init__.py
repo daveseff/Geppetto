@@ -1,10 +1,13 @@
 from .authorized_key import AuthorizedKeyOperation
 from .base import Operation
+from .cron import CronOperation
 from .file import FileOperation
 from .mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
 from .package import PackageOperation
 from .remote import RemoteFileOperation, RpmInstallOperation
 from .service import ServiceOperation
+from .sysctl import SysctlOperation
+from .timezone import TimezoneOperation
 from .user import UserOperation
 
 OPERATION_REGISTRY = {
@@ -18,6 +21,9 @@ OPERATION_REGISTRY = {
     "network_mount": NetworkMountOperation,
     "remote_file": RemoteFileOperation,
     "rpm": RpmInstallOperation,
+    "timezone": TimezoneOperation,
+    "sysctl": SysctlOperation,
+    "cron": CronOperation,
 }
 
 __all__ = [
@@ -32,5 +38,8 @@ __all__ = [
     "NetworkMountOperation",
     "RemoteFileOperation",
     "RpmInstallOperation",
+    "TimezoneOperation",
+    "SysctlOperation",
+    "CronOperation",
     "OPERATION_REGISTRY",
 ]

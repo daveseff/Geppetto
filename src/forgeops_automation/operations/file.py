@@ -40,7 +40,7 @@ class FileOperation(Operation):
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         if self.link_target:
-            return self._apply_symlink(executor)
+            return self._apply_symlink(host, executor)
         if self.state == "present":
             content = self._render_content(host)
             changed, detail = executor.write_file(self.path, content=content, mode=self.mode)
@@ -63,12 +63,11 @@ class FileOperation(Operation):
         template = Template(template_text)
         return template.safe_substitute(context)
 
-    def _apply_symlink(self, executor: Executor) -> ActionResult:
-        host_name = executor.host.name
+    def _apply_symlink(self, host: HostConfig, executor: Executor) -> ActionResult:
         if self.state == "absent":
-            removed = self._remove_path(executor)
+            removed = executor.remove_path(self.path)
             detail = "removed" if removed else "noop"
-            return ActionResult(host=host_name, action="file", changed=removed, details=detail)
+            return ActionResult(host=host.name, action="file", changed=removed, details=detail)
 
         current_target = None
         try:
@@ -78,29 +77,14 @@ class FileOperation(Operation):
             current_target = None
 
         if current_target == self.link_target:
-            return ActionResult(host=host_name, action="file", changed=False, details="noop")
+            return ActionResult(host=host.name, action="file", changed=False, details="noop")
 
         if not executor.dry_run:
-            if self.path.exists() or self.path.is_symlink():
-                if self.path.is_dir() and not self.path.is_symlink():
-                    shutil.rmtree(self.path)
-                else:
-                    self.path.unlink(missing_ok=True)
+            executor.remove_path(self.path)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             os.symlink(self.link_target, self.path)
         detail = f"link->{self.link_target}"
-        return ActionResult(host=host_name, action="file", changed=True, details=detail)
-
-    def _remove_path(self, executor: Executor) -> bool:
-        if not self.path.exists() and not self.path.is_symlink():
-            return False
-        if executor.dry_run:
-            return True
-        if self.path.is_dir() and not self.path.is_symlink():
-            shutil.rmtree(self.path)
-        else:
-            self.path.unlink(missing_ok=True)
-        return True
+        return ActionResult(host=host.name, action="file", changed=True, details=detail)
 
     @staticmethod
     def _parse_mode(value: object | None) -> int | None:
