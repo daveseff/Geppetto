@@ -4,7 +4,7 @@ import logging
 
 from .executors import AgentExecutor, Executor, LocalExecutor
 from .operations import OPERATION_REGISTRY, Operation
-from .types import ActionResult, HostConfig, Plan, TaskSpec
+from .types import ActionResult, ActionSpec, HostConfig, Plan, TaskSpec
 
 logger = logging.getLogger(__name__)
 

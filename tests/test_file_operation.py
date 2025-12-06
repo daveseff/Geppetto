@@ -38,6 +38,38 @@ def test_file_absent_removes_files(tmp_path: Path) -> None:
     assert not target.exists()
 
 
+def test_file_symlink_creation(tmp_path: Path) -> None:
+    target = tmp_path / "target"
+    target.write_text("data")
+    link = tmp_path / "link"
+    spec = {"path": str(link), "link_target": str(target)}
+    op = FileOperation(spec)
+
+    result = op.apply(HostConfig("local"), build_executor())
+
+    assert result.changed is True
+    assert link.is_symlink()
+    assert link.readlink() == target
+
+    # Running again should be noop
+    result = op.apply(HostConfig("local"), build_executor())
+    assert result.changed is False
+
+
+def test_file_symlink_removed(tmp_path: Path) -> None:
+    target = tmp_path / "target2"
+    target.write_text("data")
+    link = tmp_path / "link2"
+    os.symlink(target, link)
+    spec = {"path": str(link), "link_target": str(target), "state": "absent"}
+    op = FileOperation(spec)
+
+    result = op.apply(HostConfig("local"), build_executor())
+
+    assert result.changed is True
+    assert not link.exists()
+
+
 def test_file_template_renders_host_variables(tmp_path: Path, monkeypatch) -> None:
     template = tmp_path / "motd.tmpl"
     template.write_text("Hello ${name} from ${env}")
