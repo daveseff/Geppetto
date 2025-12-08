@@ -16,6 +16,7 @@ from .types import ActionResult
 
 class Ansi:
     GREEN = "\033[92m"
+    YELLOW = "\033[93m"
     RED = "\033[91m"
     BLUE = "\033[94m"
     ORANGE = "\033[38;5;208m"
@@ -28,6 +29,8 @@ def colorize(text: str, color: str | None) -> str:
     if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
         return text
     return f"{color}{text}{Ansi.RESET}"
+
+_last_progress_len = 0
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -81,14 +84,25 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     state_store = None if args.dry_run else StateStore(state_path)
 
-    runner = TaskRunner(plan, dry_run=args.dry_run, state_store=state_store)
+    runner = TaskRunner(
+        plan,
+        dry_run=args.dry_run,
+        state_store=state_store,
+        progress_callback=print_progress,
+    )
     results = runner.run()
 
     effective_level = logging.getLogger().getEffectiveLevel()
+    summary = Summary()
     for result in results:
+        _clear_progress()
+        summary.add(result)
         if not should_display_result(result, effective_level):
             continue
         print(format_result(result))
+
+    _clear_progress()
+    print(summary.render())
 
     return 0
 
@@ -117,11 +131,74 @@ def format_result(result: ActionResult) -> str:
 def should_display_result(result: ActionResult, log_level: int) -> bool:
     if result.failed or result.changed:
         return True
-    if log_level <= logging.DEBUG:
-        return True
-    if "noop" in result.details.lower():
-        return False
-    return True
+    return log_level <= logging.DEBUG
+
+
+def print_progress(host, action) -> None:
+    global _last_progress_len
+    resource = _progress_resource(action.data)
+    suffix = f"[{resource}]" if resource else ""
+    line = f"{host.name}::{action.type}{suffix} pending..."
+    _last_progress_len = len(line)
+    print(colorize(line, Ansi.YELLOW), end="\r", flush=True)
+
+
+def _progress_resource(data: dict) -> str | None:
+    for key in ("resource", "name", "path", "mount_point", "user", "service"):
+        value = data.get(key)
+        if value:
+            return str(value)
+    pkgs = data.get("packages")
+    if isinstance(pkgs, (list, tuple)) and pkgs:
+        rendered = ", ".join(str(p) for p in pkgs[:3])
+        if len(pkgs) > 3:
+            rendered += ", ..."
+        return rendered
+    return None
+
+
+def _clear_progress() -> None:
+    global _last_progress_len
+    if _last_progress_len:
+        print(" " * _last_progress_len, end="\r", flush=True)
+        _last_progress_len = 0
+
+
+class Summary:
+    def __init__(self) -> None:
+        self.changes = 0
+        self.additions = 0
+        self.rollbacks = 0
+        self.failures = 0
+
+    def add(self, result: ActionResult) -> None:
+        if result.failed:
+            self.failures += 1
+            return
+        if not result.changed:
+            return
+        self.changes += 1
+        if _looks_like_rollback(result):
+            self.rollbacks += 1
+        else:
+            self.additions += 1
+
+    def render(self) -> str:
+        parts = [
+            f"Changes: {self.changes}",
+            f"Additions: {self.additions}",
+            f"Rollbacks: {self.rollbacks}",
+            f"Failures: {self.failures}",
+        ]
+        text = " | ".join(parts)
+        color = Ansi.GREEN if self.failures == 0 else Ansi.RED
+        return colorize(text, color)
+
+
+def _looks_like_rollback(result: ActionResult) -> bool:
+    text = (result.details or "").lower()
+    rollback_tokens = {"remove", "removed", "absent", "deleted", "stopped", "disabled", "unmounted"}
+    return any(token in text for token in rollback_tokens)
 
 
 if __name__ == "__main__":
