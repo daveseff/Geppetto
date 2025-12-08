@@ -87,3 +87,27 @@ def test_file_template_renders_host_variables(tmp_path: Path, monkeypatch) -> No
 
     assert result.changed is True
     assert target.read_text() == "Hello ForgeOps from Dev"
+
+
+def test_file_template_renders_jinja_loop(tmp_path: Path) -> None:
+    template = tmp_path / "hosts.j2"
+    template.write_text(
+        "allowed_hosts:\n"
+        "{% for host in allowed_hosts %}"
+        "  - {{ host }}\n"
+        "{% endfor %}"
+    )
+    target = tmp_path / "hosts.yaml"
+    spec = {
+        "path": str(target),
+        "state": "present",
+        "template": str(template),
+        "variables": {"allowed_hosts": ["a.example", "b.example"]},
+    }
+    host = HostConfig(name="local")
+    op = FileOperation(spec)
+
+    result = op.apply(host, build_executor())
+
+    assert result.changed is True
+    assert "a.example" in target.read_text()

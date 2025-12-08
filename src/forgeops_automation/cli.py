@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .config import load_config
+from .dsl import DSLParseError
 from .inventory import InventoryLoader
 from .runner import TaskRunner
 from .state import StateStore
@@ -76,7 +77,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     cfg = load_config(args.config)
     plan_path = args.plan or cfg.plan
     loader = InventoryLoader()
-    plan = loader.load(plan_path)
+    try:
+        plan = loader.load(plan_path)
+    except (DSLParseError, ValueError) as exc:
+        _clear_progress()
+        print(colorize(f"Plan validation failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
 
     state_path = args.state_file or cfg.state_file
     if not state_path:

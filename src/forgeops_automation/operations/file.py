@@ -4,11 +4,17 @@ import os
 import shutil
 from pathlib import Path
 from string import Template
+import re
 
 from .base import Operation
 from ..executors import Executor
 from ..types import ActionResult, HostConfig
 
+# Optional dependency; resolved at render time if Jinja syntax is detected
+try:  # pragma: no cover
+    import jinja2
+except Exception:  # pragma: no cover
+    jinja2 = None
 
 class FileOperation(Operation):
     """Ensure files exist with the requested contents."""
@@ -57,6 +63,10 @@ class FileOperation(Operation):
         if not template_path.is_absolute() and self.plan_dir is not None:
             template_path = self.plan_dir / template_path
         template_text = template_path.read_text()
+        if self._looks_like_jinja(template_text):
+            if jinja2 is None:
+                raise RuntimeError("Jinja2 is required to render this template (pip install Jinja2)")
+            return self._render_jinja(template_text, host)
         context: dict[str, object] = dict(host.variables)
         for key, value in self.variables.items():
             context[key] = value
@@ -97,3 +107,16 @@ class FileOperation(Operation):
             return None
         base = 8 if text.startswith("0") else 10
         return int(text, base)
+
+    def _render_jinja(self, template_text: str, host: HostConfig) -> str:
+        assert jinja2 is not None  # For mypy/static checkers
+        env = jinja2.Environment(undefined=jinja2.StrictUndefined, autoescape=False)
+        tmpl = env.from_string(template_text)
+        context: dict[str, object] = dict(host.variables)
+        for key, value in self.variables.items():
+            context[key] = value
+        return tmpl.render(**context)
+
+    @staticmethod
+    def _looks_like_jinja(template_text: str) -> bool:
+        return bool(re.search(r"{[{%]", template_text))

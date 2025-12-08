@@ -18,24 +18,27 @@ class InventoryLoader:
         path = Path(path)
         suffix = path.suffix.lower()
         base_dir = path.parent
-        if suffix == ".toml":
-            plan = self._load_toml(path)
-            self._attach_plan_dir(plan, base_dir)
-            return plan
-        if suffix in {".fops", ".pp"}:
-            text = self._read_with_includes(path)
-            plan = DSLParser().parse_text(text)
-            self._attach_plan_dir(plan, base_dir)
-            return plan
-
-        text = path.read_text()
         try:
-            plan = DSLParser().parse_text(text)
-        except DSLParseError:
-            data = tomllib.loads(text)
-            hosts = self._parse_hosts(data.get("hosts", {}))
-            tasks = self._parse_tasks(data.get("tasks", []), hosts)
-            plan = Plan(hosts=hosts, tasks=tasks)
+            if suffix == ".toml":
+                plan = self._load_toml(path)
+            elif suffix in {".fops", ".pp"}:
+                text = self._read_with_includes(path)
+                plan = DSLParser().parse_text(text)
+            else:
+                text = path.read_text()
+                try:
+                    plan = DSLParser().parse_text(text)
+                except DSLParseError:
+                    data = tomllib.loads(text)
+                    hosts = self._parse_hosts(data.get("hosts", {}))
+                    tasks = self._parse_tasks(data.get("tasks", []), hosts)
+                    plan = Plan(hosts=hosts, tasks=tasks)
+        except DSLParseError as exc:
+            line = f"{exc.line}:{exc.column}" if exc.line is not None else "?"
+            raise DSLParseError(f"{path}:{line} {exc}") from None
+        except tomllib.TOMLDecodeError as exc:
+            raise ValueError(f"{path}:{exc.lineno}:{exc.colno} {exc.msg}") from None
+
         self._attach_plan_dir(plan, base_dir)
         return plan
 

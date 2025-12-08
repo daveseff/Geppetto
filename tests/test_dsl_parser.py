@@ -41,3 +41,13 @@ def test_non_package_list_title_raises() -> None:
     """
     with pytest.raises(DSLParseError):
         parser.parse_text(sample)
+
+
+def test_parse_error_has_line_and_column() -> None:
+    parser = DSLParser()
+    bad = "task 't' on 'local' {\n  file {\n}\n"
+    with pytest.raises(DSLParseError) as excinfo:
+        parser.parse_text(bad)
+    err = excinfo.value
+    assert err.line == 3
+    assert err.column is not None

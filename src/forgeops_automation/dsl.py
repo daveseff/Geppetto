@@ -10,12 +10,19 @@ from .types import ActionSpec, HostConfig, Plan, TaskSpec
 class DSLParseError(ValueError):
     """Raised when the ForgeOps DSL cannot be parsed."""
 
+    def __init__(self, message: str, line: int | None = None, column: int | None = None):
+        super().__init__(message)
+        self.line = line
+        self.column = column
+
 
 @dataclass
 class Token:
     type: str
     value: str
     position: int
+    line: int
+    column: int
 
 
 class Tokenizer:
@@ -32,12 +39,14 @@ class Tokenizer:
         self.text = text
         self.length = len(text)
         self.pos = 0
+        self.line = 1
+        self.column = 1
 
     def __iter__(self) -> Iterator[Token]:
         while self.pos < self.length:
-            ch = self.text[self.pos]
+            ch = self._peek_char()
             if ch.isspace():
-                self.pos += 1
+                self._advance()
                 continue
             if ch == "#":
                 self._skip_comment()
@@ -47,53 +56,63 @@ class Tokenizer:
                 continue
             if ch == "=" and self._peek(1) == ">":
                 start = self.pos
-                self.pos += 2
-                yield Token("ARROW", "=>", start)
+                start_line, start_col = self.line, self.column
+                self._advance(2)
+                yield Token("ARROW", "=>", start, start_line, start_col)
                 continue
             token_type = self.SIMPLE_TOKENS.get(ch)
             if token_type:
                 start = self.pos
-                self.pos += 1
-                yield Token(token_type, ch, start)
+                start_line, start_col = self.line, self.column
+                self._advance()
+                yield Token(token_type, ch, start, start_line, start_col)
                 continue
             if self._is_ident_start(ch):
                 yield self._identifier()
                 continue
-            raise DSLParseError(f"Unexpected character '{ch}' at position {self.pos}")
-        yield Token("EOF", "", self.pos)
+            raise DSLParseError(
+                f"Unexpected character '{ch}'",
+                line=self.line,
+                column=self.column,
+            )
+        yield Token("EOF", "", self.pos, self.line, self.column)
 
     def _string(self) -> Token:
-        quote = self.text[self.pos]
+        quote = self._peek_char()
         start = self.pos
-        self.pos += 1
+        start_line, start_col = self.line, self.column
+        self._advance()
         result: list[str] = []
         while self.pos < self.length:
-            ch = self.text[self.pos]
+            ch = self._peek_char()
             if ch == "\\":
-                self.pos += 1
+                self._advance()
                 if self.pos >= self.length:
-                    raise DSLParseError("Unterminated string literal")
-                esc = self.text[self.pos]
+                    raise DSLParseError("Unterminated string literal", line=self.line, column=self.column)
+                esc = self._peek_char()
                 escapes = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"', "'": "'"}
                 result.append(escapes.get(esc, esc))
-                self.pos += 1
+                self._advance()
                 continue
             if ch == quote:
-                self.pos += 1
-                return Token("STRING", "".join(result), start)
+                self._advance()
+                return Token("STRING", "".join(result), start, start_line, start_col)
             result.append(ch)
-            self.pos += 1
-        raise DSLParseError("Unterminated string literal")
+            self._advance()
+        raise DSLParseError("Unterminated string literal", line=self.line, column=self.column)
 
     def _identifier(self) -> Token:
         start = self.pos
+        start_line, start_col = self.line, self.column
         while self.pos < self.length and self._is_ident_part(self.text[self.pos]):
-            self.pos += 1
-        return Token("IDENT", self.text[start:self.pos], start)
+            self._advance()
+        return Token("IDENT", self.text[start:self.pos], start, start_line, start_col)
 
     def _skip_comment(self) -> None:
         while self.pos < self.length and self.text[self.pos] != "\n":
-            self.pos += 1
+            self._advance()
+        if self.pos < self.length:
+            self._advance()  # consume newline
 
     @staticmethod
     def _is_ident_start(ch: str) -> bool:
@@ -109,10 +128,26 @@ class Tokenizer:
             return ""
         return self.text[idx]
 
+    def _peek_char(self) -> str:
+        return self.text[self.pos]
+
+    def _advance(self, count: int = 1) -> None:
+        for _ in range(count):
+            if self.pos >= self.length:
+                return
+            ch = self.text[self.pos]
+            self.pos += 1
+            if ch == "\n":
+                self.line += 1
+                self.column = 1
+            else:
+                self.column += 1
+
 
 class DSLParser:
     def parse_text(self, text: str) -> Plan:
         tokenizer = Tokenizer(text)
+        self.source_text = text
         self.tokens: list[Token] = list(tokenizer)
         self.index = 0
         hosts: dict[str, HostConfig] = {}
@@ -125,7 +160,11 @@ class DSLParser:
                 tasks.append(self._parse_task())
             else:
                 token = self._peek()
-                raise DSLParseError(f"Unexpected token '{token.value}' at {token.position}")
+                raise DSLParseError(
+                    f"Unexpected token '{token.value}'",
+                    line=token.line,
+                    column=token.column,
+                )
         if not hosts:
             hosts["local"] = HostConfig(name="local")
         return Plan(hosts=hosts, tasks=tasks)
@@ -225,7 +264,11 @@ class DSLParser:
             return token.value
         if token.type == "LBRACKET":
             return self._parse_list()
-        raise DSLParseError(f"Unexpected value token '{token.value}' at {token.position}")
+        raise DSLParseError(
+            f"Unexpected value token '{token.value}'",
+            line=token.line,
+            column=token.column,
+        )
 
     def _parse_list(self) -> list[object]:
         values: list[object] = []
@@ -239,7 +282,11 @@ class DSLParser:
     def _parse_string_like(self) -> str:
         token = self._peek()
         if token.type not in {"STRING", "IDENT"}:
-            raise DSLParseError(f"Expected identifier or string at {token.position}")
+            raise DSLParseError(
+                f"Expected identifier or string but found '{token.value}'",
+                line=token.line,
+                column=token.column,
+            )
         self._advance()
         return token.value
 
@@ -261,7 +308,11 @@ class DSLParser:
         if not self._check(token_type, value):
             got = self._peek()
             detail = f" {value}" if value else ""
-            raise DSLParseError(f"Expected {token_type}{detail} but found '{got.value}'")
+            raise DSLParseError(
+                f"Expected {token_type}{detail} but found '{got.value}'",
+                line=got.line,
+                column=got.column,
+            )
         return self._advance()
 
     def _advance(self) -> Token:
