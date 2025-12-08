@@ -32,6 +32,9 @@ class Executor:
         *,
         check: bool = True,
         mutable: bool = True,
+        env: dict[str, str] | None = None,
+        cwd: str | Path | None = None,
+        timeout: float | None = None,
     ) -> CommandResult:
         """Run ``command`` and optionally skip it during dry-runs."""
 
@@ -39,11 +42,19 @@ class Executor:
         if self.dry_run and mutable:
             return CommandResult(cmd_list, "", "skipped (dry-run)", 0)
 
+        exec_env = None
+        if env:
+            exec_env = os.environ.copy()
+            exec_env.update(env)
+
         proc = subprocess.run(
             cmd_list,
             capture_output=True,
             text=True,
             check=False,
+            env=exec_env,
+            cwd=str(cwd) if cwd is not None else None,
+            timeout=timeout,
         )
         if check and proc.returncode != 0:
             raise subprocess.CalledProcessError(

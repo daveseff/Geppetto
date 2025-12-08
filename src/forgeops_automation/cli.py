@@ -84,7 +84,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     runner = TaskRunner(plan, dry_run=args.dry_run, state_store=state_store)
     results = runner.run()
 
+    effective_level = logging.getLogger().getEffectiveLevel()
     for result in results:
+        if not should_display_result(result, effective_level):
+            continue
         print(format_result(result))
 
     return 0
@@ -109,6 +112,16 @@ def format_result(result: ActionResult) -> str:
     resource = f"[{result.resource}]" if result.resource else ""
     line = f"{result.host}::{result.action}{resource} {status} - {result.details}"
     return colorize(line, color)
+
+
+def should_display_result(result: ActionResult, log_level: int) -> bool:
+    if result.failed or result.changed:
+        return True
+    if log_level <= logging.DEBUG:
+        return True
+    if "noop" in result.details.lower():
+        return False
+    return True
 
 
 if __name__ == "__main__":

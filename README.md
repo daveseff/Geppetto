@@ -8,6 +8,7 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 - Declarative plan files written in TOML describing hosts, tasks, and actions.
 - Pluggable executor abstraction – today a `LocalExecutor`, with hooks for future agent/server transport.
 - First-class operations for package installation/removal and file management.
+- New `exec` resource to mirror Puppet's `exec` (guards, `creates`, env, cwd, allowed return codes).
 - Built-in dry-run flag so you can validate idempotent behavior before touching a node.
 
 ## Project layout
@@ -63,12 +64,22 @@ task 'bootstrap' on ['local'] {
     mode    => '0644'
     template => 'examples/templates/motd.tmpl'
   }
+
+  exec { 'seed-db':
+    command => '/usr/local/bin/seed --once'
+    creates => '/var/lib/app/.seeded'
+    only_if => 'test -x /usr/local/bin/seed'
+    env     => ['ENV=staging']
+    timeout => 120
+  }
 }
 ```
 
 include 'shared/common.fops'
 
 ```
+
+`exec` runs commands through `/bin/sh -c` when given a string, supports `creates` skip files, `only_if`/`unless` guards, `cwd`, per-command `env` (list of `KEY=value` or a map), allowed `returns` codes, and `timeout` in seconds.
 
 Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks): the referenced file (relative or absolute path) is rendered via Python's `string.Template` using host variables (from the `node` definition) plus any per-resource `variables` (available in TOML plans). Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. Service resources map onto `systemctl`, user resources wrap `useradd/usermod/userdel`, `authorized_key` resources keep SSH keys idempotent (with automatic base64 decoding), filesystem operations manage `/etc/fstab` entries plus `mount`/`umount` steps for both EFS and block devices, `remote_file` fetches artifacts from local paths/S3/HTTP, `rpm` downloads + installs RPMs when they aren’t already present, `timezone` sets `/etc/localtime`, `sysctl` manages kernel tunables, and `cron` manages `/etc/cron.d` jobs. DSL plans can also include additional files via `include 'relative/path.fops'` directives; include paths resolve relative to the parent plan. Resources can coordinate ordering by setting `depends_on => ['user.forgeops']`, ensuring dependent actions run after their prerequisites (and before them during cleanup).
 

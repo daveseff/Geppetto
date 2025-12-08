@@ -18,9 +18,12 @@ class SysctlOperation(Operation):
         if "=" in self.name:
             raise ValueError("sysctl name should not contain '='")
         raw_value = spec.get("value")
-        if raw_value is None:
+        self.state = str(spec.get("state", "present"))
+        if self.state not in {"present", "absent"}:
+            raise ValueError("sysctl state must be 'present' or 'absent'")
+        if raw_value is None and self.state != "absent":
             raise ValueError("sysctl operation requires a value")
-        self.value = str(raw_value)
+        self.value = "" if raw_value is None else str(raw_value)
         self.persist = bool(spec.get("persist", True))
         default_conf = f"/etc/sysctl.d/{self.name.replace('.', '_')}.conf"
         self.conf_file = Path(spec.get("conf_file", default_conf))
@@ -29,6 +32,15 @@ class SysctlOperation(Operation):
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         changed = False
         details: list[str] = []
+
+        if self.state == "absent":
+            changed = False
+            detail_parts: list[str] = []
+            if self.persist and executor.remove_path(self.conf_file):
+                changed = True
+                detail_parts.append("persist-removed")
+            detail = ", ".join(detail_parts) if detail_parts else "noop"
+            return ActionResult(host=host.name, action="sysctl", changed=changed, details=detail)
 
         if self.apply_runtime:
             executor.run(["sysctl", "-w", f"{self.name}={self.value}"])

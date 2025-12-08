@@ -37,6 +37,10 @@ DESTROY_BUILDERS: dict[str, Callable[[dict[str, Any]], dict[str, Any] | None]] =
     "network_mount": lambda spec: {**spec, "state": "absent"},
     "block_device": lambda spec: {**spec, "state": "absent", "mount": True},
     "rpm": lambda spec: {**spec, "state": "absent"},
+    "package": lambda spec: {**spec, "state": "absent"},
+    "timezone": lambda spec: {**spec, "state": "absent"},
+    "sysctl": lambda spec: {**spec, "state": "absent"},
+    "cron": lambda spec: {**spec, "state": "absent"},
 }
 
 

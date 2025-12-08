@@ -32,3 +32,18 @@ def test_timezone_creates_symlink(tmp_path: Path) -> None:
 
     result = op.apply(HostConfig("local"), executor)
     assert result.changed is False
+
+    remove_op = TimezoneOperation(
+        {
+            "zone": "Australia/Brisbane",
+            "zoneinfo_dir": str(zone_dir),
+            "localtime_path": str(localtime),
+            "manage_etc_timezone": True,
+            "etc_timezone_path": str(etc_zone),
+            "state": "absent",
+        }
+    )
+    result = remove_op.apply(HostConfig("local"), executor)
+    assert result.changed is True
+    assert not localtime.exists()
+    assert not etc_zone.exists()

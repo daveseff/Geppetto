@@ -12,10 +12,11 @@ logger = logging.getLogger(__name__)
 class TaskRunner:
     """Coordinates the execution of automation tasks."""
 
-    def __init__(self, plan: Plan, *, dry_run: bool = False, state_store=None):
+    def __init__(self, plan: Plan, *, dry_run: bool = False, state_store=None, progress_callback=None):
         self.plan = plan
         self.dry_run = dry_run
         self.state_store = state_store
+        self.progress_callback = progress_callback
 
     def run(self) -> list[ActionResult]:
         results: list[ActionResult] = []
@@ -51,6 +52,11 @@ class TaskRunner:
                     )
                     continue
                 operation: Operation = operation_cls(action.data)
+                if self.progress_callback:
+                    try:
+                        self.progress_callback(host, action)
+                    except Exception:  # pragma: no cover
+                        logger.debug("progress callback failed", exc_info=True)
                 try:
                     result = operation.apply(host, executor)
                 except Exception as exc:  # noqa: BLE001

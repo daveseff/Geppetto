@@ -160,7 +160,8 @@ spec_file="$WORKDIR/SPECS/${NAME}.spec"
   [[ -n "$VENDOR" ]] && printf 'Vendor:         %s\n' "$VENDOR"
   printf 'BuildArch:      %s\n' "$ARCH"
   printf 'Source0:        %%{name}-%%{version}.tar.gz\n'
-  printf 'AutoReqProv:    no\n\n'
+  printf 'AutoReqProv:    no\n'
+  printf 'Requires:       python3.13\n\n'
   printf '%%description\n%s\n\n' "$DESCRIPTION"
   printf '%%prep\n%%setup -q\n\n'
   printf '%%build\n# no build step\n\n'

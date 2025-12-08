@@ -9,6 +9,7 @@ from .service import ServiceOperation
 from .sysctl import SysctlOperation
 from .timezone import TimezoneOperation
 from .user import UserOperation
+from .exec import ExecOperation
 
 OPERATION_REGISTRY = {
     "package": PackageOperation,
@@ -24,6 +25,7 @@ OPERATION_REGISTRY = {
     "timezone": TimezoneOperation,
     "sysctl": SysctlOperation,
     "cron": CronOperation,
+    "exec": ExecOperation,
 }
 
 __all__ = [
@@ -41,5 +43,6 @@ __all__ = [
     "TimezoneOperation",
     "SysctlOperation",
     "CronOperation",
+    "ExecOperation",
     "OPERATION_REGISTRY",
 ]

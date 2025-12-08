@@ -7,7 +7,7 @@ name = "forgeops-automation"
 version = "0.1.0"
 description = "Lightweight systems automation toolkit for ForgeOps"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 authors = [{name = "Dave Seff", email = "dave@seff.com.au"}]
 license = {text = "MIT"}
 classifiers = [

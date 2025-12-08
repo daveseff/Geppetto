@@ -27,7 +27,20 @@ class TimezoneOperation(Operation):
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         if self.state == "absent":
-            return ActionResult(host=host.name, action="timezone", changed=False, details="noop")
+            changed = False
+            details: list[str] = []
+            if self.localtime_path.exists() or self.localtime_path.is_symlink():
+                changed = True
+                details.append("localtime")
+                if not executor.dry_run:
+                    self.localtime_path.unlink(missing_ok=True)
+            if self.manage_etc_timezone and self.etc_timezone.exists():
+                changed = True
+                details.append("etc_timezone")
+                if not executor.dry_run:
+                    self.etc_timezone.unlink(missing_ok=True)
+            detail = ", ".join(details) if details else "noop"
+            return ActionResult(host=host.name, action="timezone", changed=changed, details=detail)
 
         target_file = self.zoneinfo_dir / self.zone
         if not target_file.exists():

@@ -32,7 +32,10 @@ class RecordingExecutor:
         return True, "content"
 
     def remove_path(self, path: Path):  # noqa: ARG002
-        return False
+        if not path.exists():
+            return False
+        path.unlink()
+        return True
 
 
 def test_sysctl_applies_and_persists(tmp_path: Path) -> None:
@@ -54,3 +57,8 @@ def test_sysctl_applies_and_persists(tmp_path: Path) -> None:
     result = op.apply(HostConfig("local"), exec)
     assert result.changed is True  # runtime apply
     assert len(exec.commands) == 2
+
+    remove = SysctlOperation({"name": "net.ipv4.ip_forward", "value": 1, "conf_file": str(conf), "state": "absent"})
+    result = remove.apply(HostConfig("local"), exec)
+    assert result.changed is True
+    assert not conf.exists()
