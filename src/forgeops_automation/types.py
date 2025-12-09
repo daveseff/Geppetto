@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass
 class HostConfig:
     name: str
     connection: str = "local"
-    address: str | None = None
+    address: Optional[str] = None
     variables: dict[str, Any] = field(default_factory=dict)
 
 
@@ -39,4 +39,4 @@ class ActionResult:
     changed: bool
     details: str
     failed: bool = False
-    resource: str | None = None
+    resource: Optional[str] = None

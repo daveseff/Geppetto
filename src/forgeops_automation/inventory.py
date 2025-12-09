@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import re
-import tomllib
+
+try:
+    import tomllib  # type: ignore[attr-defined]
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from .dsl import DSLParseError, DSLParser
 from .types import ActionSpec, HostConfig, Plan, TaskSpec
@@ -100,7 +104,7 @@ class InventoryLoader:
             for action in task.actions:
                 action.data.setdefault("_plan_dir", base)
 
-    def _read_with_includes(self, path: Path, seen: set[Path] | None = None) -> str:
+    def _read_with_includes(self, path: Path, seen: Optional[set[Path]] = None) -> str:
         seen = seen or set()
         real = path.resolve()
         if real in seen:
@@ -118,7 +122,7 @@ class InventoryLoader:
         return "\n".join(lines)
 
     @staticmethod
-    def _line_snippet(text: str, line_number: int | None) -> str:
+    def _line_snippet(text: str, line_number: Optional[int]) -> str:
         if line_number is None:
             return ""
         lines = text.splitlines()

@@ -4,7 +4,7 @@ import hashlib
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import os
 
 from .base import Operation
@@ -53,8 +53,8 @@ class RemoteFileOperation(Operation):
         if self.state not in {"present", "absent"}:
             raise ValueError("remote_file state must be 'present' or 'absent'")
         checksum = spec.get("checksum")
-        self.checksum_algo: str | None = None
-        self.checksum_value: str | None = None
+        self.checksum_algo: Optional[str] = None
+        self.checksum_value: Optional[str] = None
         if checksum:
             text = str(checksum)
             if ":" in text:
@@ -97,7 +97,7 @@ class RemoteFileOperation(Operation):
             RemoteFetcher.cleanup(tmp)
 
     @staticmethod
-    def _parse_mode(value: Any | None) -> int | None:
+    def _parse_mode(value: Optional[Any]) -> Optional[int]:
         if value is None:
             return None
         if isinstance(value, int):

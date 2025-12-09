@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Optional
 import logging
 import shutil
 
@@ -52,7 +52,7 @@ class PackageManagerFactory:
     ]
 
     @classmethod
-    def create(cls, preferred: object | None) -> "PackageManager":
+    def create(cls, preferred: Optional[object]) -> "PackageManager":
         if isinstance(preferred, str):
             preferred = preferred.lower()
             for _, key, factory in cls._MANAGERS:

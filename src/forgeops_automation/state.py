@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 import os
 
 from .operations import OPERATION_REGISTRY
@@ -27,7 +27,7 @@ def _destroy_file(spec: dict[str, Any]) -> dict[str, Any]:
     return new_spec
 
 
-DESTROY_BUILDERS: dict[str, Callable[[dict[str, Any]], dict[str, Any] | None]] = {
+DESTROY_BUILDERS: dict[str, Callable[[dict[str, Any]], Optional[dict[str, Any]]]] = {
     "file": _destroy_file,
     "remote_file": _destroy_file,
     "user": lambda spec: {**spec, "state": "absent"},

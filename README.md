@@ -222,6 +222,8 @@ ForgeOps reads `/etc/forgeops/main.conf` (TOML) for defaults. Example:
 plan = "/etc/forgeops/plan.fops"
 state_file = "/var/lib/forgeops/state.json"
 template_dir = "/etc/forgeops/templates"
+aws_region = "ap-southeast-2"
+aws_profile = "default"
 ```
 
 Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.

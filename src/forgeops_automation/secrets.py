@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Any
+from typing import Any, Optional
 
 try:  # pragma: no cover
     import boto3  # type: ignore
@@ -14,7 +14,7 @@ class SecretResolver:
     """Resolves secret references in variable mappings."""
 
     def __init__(self):
-        self._cache: dict[tuple[str, str | None], Any] = {}
+        self._cache: dict[tuple[str, Optional[str]], Any] = {}
 
     def resolve(self, values: dict[str, Any]) -> dict[str, Any]:
         return {k: self._resolve_value(v) for k, v in values.items()}

@@ -4,6 +4,7 @@ import os
 import shutil
 from pathlib import Path
 from string import Template
+from typing import Optional
 import re
 
 from .base import Operation
@@ -100,7 +101,7 @@ class FileOperation(Operation):
         return ActionResult(host=host.name, action="file", changed=True, details=detail)
 
     @staticmethod
-    def _parse_mode(value: object | None) -> int | None:
+    def _parse_mode(value: Optional[object]) -> Optional[int]:
         if value is None:
             return None
         if isinstance(value, int):

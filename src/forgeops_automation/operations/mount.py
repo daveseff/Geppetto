@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 import time
 
 from .base import Operation
@@ -17,7 +17,7 @@ def _normalize_mount_options(options: Any, default: str) -> str:
     return str(options)
 
 
-def _coerce_bool(value: Any | None, default: bool = False) -> bool:
+def _coerce_bool(value: Optional[Any], default: bool = False) -> bool:
     if value is None:
         return default
     if isinstance(value, bool):
@@ -233,7 +233,7 @@ class BlockDeviceMountOperation(Operation, MountMixin):
         detail = ", ".join(changes) if changes else "noop"
         return ActionResult(host=host.name, action="block_device", changed=bool(changes), details=detail)
 
-    def _detect_filesystem(self, executor: Executor, device: Path) -> str | None:
+    def _detect_filesystem(self, executor: Executor, device: Path) -> Optional[str]:
         result = executor.run(
             ["blkid", "-o", "value", "-s", "TYPE", str(device)],
             check=False,
@@ -247,17 +247,17 @@ class BlockDeviceMountOperation(Operation, MountMixin):
     def _format_device(self, executor: Executor, device: Path) -> None:
         cmd: list[str]
         dev = str(device)
-        match self.filesystem.lower():
-            case "xfs":
-                cmd = ["mkfs.xfs", "-f", dev]
-            case "ext4":
-                cmd = ["mkfs.ext4", "-F", dev]
-            case "ext3":
-                cmd = ["mkfs.ext3", "-F", dev]
-            case "ext2":
-                cmd = ["mkfs.ext2", dev]
-            case _:
-                cmd = ["mkfs", "-t", self.filesystem, dev]
+        filesystem = self.filesystem.lower()
+        if filesystem == "xfs":
+            cmd = ["mkfs.xfs", "-f", dev]
+        elif filesystem == "ext4":
+            cmd = ["mkfs.ext4", "-F", dev]
+        elif filesystem == "ext3":
+            cmd = ["mkfs.ext3", "-F", dev]
+        elif filesystem == "ext2":
+            cmd = ["mkfs.ext2", dev]
+        else:
+            cmd = ["mkfs", "-t", self.filesystem, dev]
         executor.run(cmd)
 
     def _get_uuid(self, executor: Executor, device: Path) -> str:

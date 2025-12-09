@@ -5,7 +5,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Optional, Sequence
 
 from .config import load_config
 from .dsl import DSLParseError
@@ -24,7 +24,7 @@ class Ansi:
     RESET = "\033[0m"
 
 
-def colorize(text: str, color: str | None) -> str:
+def colorize(text: str, color: Optional[str]) -> str:
     if not color:
         return text
     if not sys.stdout.isatty() or os.environ.get("NO_COLOR"):
@@ -34,7 +34,7 @@ def colorize(text: str, color: str | None) -> str:
 _last_progress_len = 0
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ForgeOps automation runner")
     parser.add_argument(
         "plan",
@@ -70,11 +70,12 @@ def configure_logging(level: str) -> None:
     )
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     configure_logging(args.log_level)
 
     cfg = load_config(args.config)
+    _apply_aws_env(cfg)
     plan_path = args.plan or cfg.plan
     loader = InventoryLoader()
     try:
@@ -115,7 +116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def format_result(result: ActionResult) -> str:
     status = "changed" if result.changed else "ok"
-    color: str | None = None
+    color: Optional[str] = None
     if result.failed:
         if "unknown operation" in result.details.lower():
             status = "unknown"
@@ -149,7 +150,7 @@ def print_progress(host, action) -> None:
     print(colorize(line, Ansi.YELLOW), end="\r", flush=True)
 
 
-def _progress_resource(data: dict) -> str | None:
+def _progress_resource(data: dict) -> Optional[str]:
     for key in ("resource", "name", "path", "mount_point", "user", "service"):
         value = data.get(key)
         if value:
@@ -168,6 +169,16 @@ def _clear_progress() -> None:
     if _last_progress_len:
         print(" " * _last_progress_len, end="\r", flush=True)
         _last_progress_len = 0
+
+
+def _apply_aws_env(cfg) -> None:
+    if getattr(cfg, "aws_profile", None) and "AWS_PROFILE" not in os.environ:
+        os.environ["AWS_PROFILE"] = cfg.aws_profile  # type: ignore[assignment]
+    if getattr(cfg, "aws_region", None):
+        if "AWS_REGION" not in os.environ:
+            os.environ["AWS_REGION"] = cfg.aws_region  # type: ignore[assignment]
+        if "AWS_DEFAULT_REGION" not in os.environ:
+            os.environ["AWS_DEFAULT_REGION"] = cfg.aws_region  # type: ignore[assignment]
 
 
 class Summary:

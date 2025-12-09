@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, Optional
 
 from .executors import AgentExecutor, Executor, LocalExecutor
 from .operations import OPERATION_REGISTRY, Operation
@@ -96,7 +97,7 @@ class TaskRunner:
         raise ValueError(f"Unknown connection type '{host.connection}'")
 
     @staticmethod
-    def _resource_name(data: dict[str, Any]) -> str | None:
+    def _resource_name(data: dict[str, Any]) -> Optional[str]:
         for key in ("resource", "name", "path", "mount_point", "user", "service"):
             value = data.get(key)
             if value:

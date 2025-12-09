@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import shutil
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from .base import Operation
 from ..executors import Executor
@@ -60,7 +60,7 @@ class ServiceOperation(Operation):
         self.systemctl = SystemCtl()
 
     @staticmethod
-    def _coerce_bool(value: Any | None) -> bool | None:
+    def _coerce_bool(value: Optional[Any]) -> Optional[bool]:
         if value is None:
             return None
         if isinstance(value, bool):

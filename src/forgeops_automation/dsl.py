@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
 from .types import ActionSpec, HostConfig, Plan, TaskSpec
 
@@ -10,7 +10,7 @@ from .types import ActionSpec, HostConfig, Plan, TaskSpec
 class DSLParseError(ValueError):
     """Raised when the ForgeOps DSL cannot be parsed."""
 
-    def __init__(self, message: str, line: int | None = None, column: int | None = None):
+    def __init__(self, message: str, line: Optional[int] = None, column: Optional[int] = None):
         super().__init__(message)
         self.line = line
         self.column = column
@@ -325,13 +325,13 @@ class DSLParser:
         self._advance()
         return token.value
 
-    def _match(self, token_type: str, value: str | None = None) -> bool:
+    def _match(self, token_type: str, value: Optional[str] = None) -> bool:
         if self._check(token_type, value):
             self._advance()
             return True
         return False
 
-    def _check(self, token_type: str, value: str | None = None) -> bool:
+    def _check(self, token_type: str, value: Optional[str] = None) -> bool:
         token = self._peek()
         if token.type != token_type:
             return False
@@ -339,7 +339,7 @@ class DSLParser:
             return False
         return True
 
-    def _consume(self, token_type: str, value: str | None = None) -> Token:
+    def _consume(self, token_type: str, value: Optional[str] = None) -> Token:
         if not self._check(token_type, value):
             got = self._peek()
             detail = f" {value}" if value else ""

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Optional, Sequence
 from string import Template
 
 from .base import Operation
@@ -122,7 +122,7 @@ class ExecOperation(Operation):
         raise ValueError("exec command must be a string or list")
 
     @staticmethod
-    def _normalize_env(value: Any) -> dict[str, str] | None:
+    def _normalize_env(value: Any) -> Optional[dict[str, str]]:
         if value is None:
             return None
         if isinstance(value, dict):
@@ -148,7 +148,7 @@ class ExecOperation(Operation):
         raise ValueError("exec returns must be an int or list of ints")
 
     @staticmethod
-    def _normalize_timeout(value: Any) -> float | None:
+    def _normalize_timeout(value: Any) -> Optional[float]:
         if value is None:
             return None
         try:
@@ -165,7 +165,7 @@ class ExecOperation(Operation):
         return prefix
 
     @staticmethod
-    def _summarize_output(result: CommandResult) -> str | None:
+    def _summarize_output(result: CommandResult) -> Optional[str]:
         for text in (result.stderr, result.stdout):
             if not text:
                 continue

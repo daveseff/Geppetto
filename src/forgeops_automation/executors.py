@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Optional, Sequence, Union
 import os
 import shutil
 import stat
@@ -32,9 +32,9 @@ class Executor:
         *,
         check: bool = True,
         mutable: bool = True,
-        env: dict[str, str] | None = None,
-        cwd: str | Path | None = None,
-        timeout: float | None = None,
+        env: Optional[dict[str, str]] = None,
+        cwd: Optional[Union[str, Path]] = None,
+        timeout: Optional[float] = None,
     ) -> CommandResult:
         """Run ``command`` and optionally skip it during dry-runs."""
 
@@ -66,10 +66,10 @@ class Executor:
         return CommandResult(cmd_list, proc.stdout, proc.stderr, proc.returncode)
 
     # File primitives -----------------------------------------------------
-    def read_file(self, path: Path) -> str | None:
+    def read_file(self, path: Path) -> Optional[str]:
         raise NotImplementedError
 
-    def write_file(self, path: Path, *, content: str, mode: int | None) -> tuple[bool, str]:
+    def write_file(self, path: Path, *, content: str, mode: Optional[int]) -> tuple[bool, str]:
         raise NotImplementedError
 
     def remove_path(self, path: Path) -> bool:
@@ -79,13 +79,13 @@ class Executor:
 class LocalExecutor(Executor):
     """Executor that acts directly on the local host."""
 
-    def read_file(self, path: Path) -> str | None:
+    def read_file(self, path: Path) -> Optional[str]:
         try:
             return path.read_text()
         except FileNotFoundError:
             return None
 
-    def write_file(self, path: Path, *, content: str, mode: int | None) -> tuple[bool, str]:
+    def write_file(self, path: Path, *, content: str, mode: Optional[int]) -> tuple[bool, str]:
         current = self.read_file(path)
         changed = False
         reasons: list[str] = []
@@ -121,7 +121,7 @@ class LocalExecutor(Executor):
         return True
 
     @staticmethod
-    def _file_mode(path: Path) -> int | None:
+    def _file_mode(path: Path) -> Optional[int]:
         try:
             return stat.S_IMODE(path.stat().st_mode)
         except FileNotFoundError:
@@ -134,10 +134,10 @@ class AgentExecutor(Executor):
     def run(self, command: Sequence[str], *, check: bool = True, mutable: bool = True) -> CommandResult:  # type: ignore[override]
         raise NotImplementedError("AgentExecutor is not implemented yet")
 
-    def read_file(self, path: Path) -> str | None:  # type: ignore[override]
+    def read_file(self, path: Path) -> Optional[str]:  # type: ignore[override]
         raise NotImplementedError
 
-    def write_file(self, path: Path, *, content: str, mode: int | None) -> tuple[bool, str]:  # type: ignore[override]
+    def write_file(self, path: Path, *, content: str, mode: Optional[int]) -> tuple[bool, str]:  # type: ignore[override]
         raise NotImplementedError
 
     def remove_path(self, path: Path) -> bool:  # type: ignore[override]

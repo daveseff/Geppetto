@@ -20,7 +20,7 @@ class UserInfo:
 
 
 class UserManager:
-    def get(self, username: str) -> UserInfo | None:
+    def get(self, username: str) -> Optional[UserInfo]:
         try:
             entry = pwd.getpwnam(username)
         except KeyError:
@@ -32,10 +32,10 @@ class UserManager:
         executor: Executor,
         name: str,
         *,
-        shell: str | None,
+        shell: Optional[str],
         system: bool,
         create_home: bool,
-        comment: str | None,
+        comment: Optional[str],
     ) -> None:
         cmd = ["useradd"]
         if shell:
@@ -96,7 +96,7 @@ class UserOperation(Operation):
         self.manager = UserManager()
 
     @staticmethod
-    def _to_bool(value: Any | None) -> bool | None:
+    def _to_bool(value: Optional[Any]) -> Optional[bool]:
         if value is None:
             return None
         if isinstance(value, bool):
@@ -111,7 +111,7 @@ class UserOperation(Operation):
         return bool(value)
 
     @staticmethod
-    def _bool_with_default(value: Any | None, default: bool) -> bool:
+    def _bool_with_default(value: Optional[Any], default: bool) -> bool:
         if value is None:
             return default
         result = UserOperation._to_bool(value)

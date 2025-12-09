@@ -17,6 +17,8 @@ def test_load_config_overrides(tmp_path: Path) -> None:
         plan = "/opt/forgeops/plan.fops"
         state_file = "/var/lib/forgeops/state.json"
         template_dir = "/opt/forgeops/templates"
+        aws_region = "ap-southeast-2"
+        aws_profile = "myprofile"
         """
     )
 
@@ -24,3 +26,5 @@ def test_load_config_overrides(tmp_path: Path) -> None:
     assert config.plan == Path("/opt/forgeops/plan.fops")
     assert config.state_file == Path("/var/lib/forgeops/state.json")
     assert config.template_dir == Path("/opt/forgeops/templates")
+    assert config.aws_region == "ap-southeast-2"
+    assert config.aws_profile == "myprofile"
