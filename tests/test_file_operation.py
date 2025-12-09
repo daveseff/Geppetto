@@ -3,6 +3,7 @@ import os
 
 from forgeops_automation.executors import LocalExecutor
 from forgeops_automation.operations.file import FileOperation
+from forgeops_automation import secrets as secret_module
 from forgeops_automation.types import HostConfig
 
 
@@ -111,3 +112,40 @@ def test_file_template_renders_jinja_loop(tmp_path: Path) -> None:
 
     assert result.changed is True
     assert "a.example" in target.read_text()
+
+
+def test_file_template_renders_secret(monkeypatch, tmp_path: Path) -> None:
+    template = tmp_path / "secret.tmpl"
+    template.write_text("password={{ password }}\n")
+    target = tmp_path / "out.txt"
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def get_secret_value(self, SecretId):
+            self.calls.append(SecretId)
+            return {"SecretString": '{"password":"s3cr3t"}'}
+
+    fake_client = FakeClient()
+
+    class FakeBoto3:
+        def client(self, name):
+            assert name == "secretsmanager"
+            return fake_client
+
+    monkeypatch.setattr(secret_module, "boto3", FakeBoto3())
+
+    spec = {
+        "path": str(target),
+        "state": "present",
+        "template": str(template),
+        "variables": {"password": {"aws_secret": "app/creds", "key": "password"}},
+    }
+    host = HostConfig(name="local")
+    op = FileOperation(spec)
+
+    result = op.apply(host, build_executor())
+
+    assert result.changed is True
+    assert "s3cr3t" in target.read_text()

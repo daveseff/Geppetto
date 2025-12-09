@@ -2,6 +2,7 @@ from pathlib import Path
 
 from forgeops_automation.executors import LocalExecutor
 from forgeops_automation.operations.exec import ExecOperation
+from forgeops_automation import secrets as secret_module
 from forgeops_automation.types import HostConfig
 
 
@@ -62,3 +63,31 @@ def test_exec_passes_env() -> None:
 
     assert result.failed is False
     assert result.changed is True
+
+
+def test_exec_renders_secrets(monkeypatch, tmp_path: Path) -> None:
+    host = HostConfig("local", variables={"password": {"aws_secret": "ad-join", "key": "pw"}})
+
+    class FakeClient:
+        def get_secret_value(self, SecretId):
+            assert SecretId == "ad-join"
+            return {"SecretString": '{"pw":"sekret"}'}
+
+    class FakeBoto3:
+        def client(self, name):
+            assert name == "secretsmanager"
+            return FakeClient()
+
+    monkeypatch.setattr(secret_module, "boto3", FakeBoto3())
+
+    target = tmp_path / "out.txt"
+    op = ExecOperation(
+        {
+            "name": "write-secret",
+            "command": f"/bin/echo ${{password}} > {target}",
+        }
+    )
+    result = op.apply(host, LocalExecutor(host))
+
+    assert result.failed is False
+    assert target.read_text().strip() == "sekret"

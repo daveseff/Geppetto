@@ -43,6 +43,30 @@ def test_non_package_list_title_raises() -> None:
         parser.parse_text(sample)
 
 
+def test_map_literal_in_dsl() -> None:
+    parser = DSLParser()
+    sample = """
+    node 'local' {
+      secret => { aws_secret => 'name', key => 'password' }
+    }
+    """
+    plan = parser.parse_text(sample)
+    assert plan.hosts["local"].variables["secret"]["aws_secret"] == "name"
+
+
+def test_number_literal_in_dsl() -> None:
+    parser = DSLParser()
+    sample = """
+    task 'demo' on 'local' {
+      exec { 'timeout-test':
+        timeout => 10
+      }
+    }
+    """
+    plan = parser.parse_text(sample)
+    assert plan.tasks[0].actions[0].data["timeout"] == 10
+
+
 def test_parse_error_has_line_and_column() -> None:
     parser = DSLParser()
     bad = "task 't' on 'local' {\n  file {\n}\n"

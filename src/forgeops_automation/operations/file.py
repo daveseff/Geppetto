@@ -8,6 +8,7 @@ import re
 
 from .base import Operation
 from ..executors import Executor
+from ..secrets import SecretResolver
 from ..types import ActionResult, HostConfig
 
 # Optional dependency; resolved at render time if Jinja syntax is detected
@@ -18,6 +19,8 @@ except Exception:  # pragma: no cover
 
 class FileOperation(Operation):
     """Ensure files exist with the requested contents."""
+
+    secret_resolver = SecretResolver()
 
     def __init__(self, spec: dict[str, object]):
         super().__init__(spec)
@@ -68,8 +71,8 @@ class FileOperation(Operation):
                 raise RuntimeError("Jinja2 is required to render this template (pip install Jinja2)")
             return self._render_jinja(template_text, host)
         context: dict[str, object] = dict(host.variables)
-        for key, value in self.variables.items():
-            context[key] = value
+        context.update(self.variables)
+        context = self.secret_resolver.resolve(context)
         template = Template(template_text)
         return template.safe_substitute(context)
 
@@ -113,8 +116,8 @@ class FileOperation(Operation):
         env = jinja2.Environment(undefined=jinja2.StrictUndefined, autoescape=False)
         tmpl = env.from_string(template_text)
         context: dict[str, object] = dict(host.variables)
-        for key, value in self.variables.items():
-            context[key] = value
+        context.update(self.variables)
+        context = self.secret_resolver.resolve(context)
         return tmpl.render(**context)
 
     @staticmethod

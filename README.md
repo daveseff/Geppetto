@@ -10,6 +10,7 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 - First-class operations for package installation/removal and file management.
 - New `exec` resource to mirror Puppet's `exec` (guards, `creates`, env, cwd, allowed return codes).
 - Built-in dry-run flag so you can validate idempotent behavior before touching a node.
+- File templates support both `$var` substitution and Jinja (`{{ }}` / `{% %}`) for loops and conditionals, including values pulled from AWS Secrets Manager.
 
 ## Project layout
 
@@ -89,6 +90,19 @@ allowed_hosts:
   - {{ host }}
 {% endfor %}
 ```
+
+Secrets can be injected at render time by pointing variables at AWS Secrets Manager:
+
+```
+file { '/etc/app/config':
+  template => 'templates/app.conf.j2'
+  variables => {
+    db_password = { aws_secret = 'prod/db', key = 'password' }
+  }
+}
+```
+
+With JSON secrets, set `key` to the field name; string secrets are used as-is. Requires `boto3` on the runner host.
 
 Relative template paths resolve against the directory containing the plan file, so `/etc/forgeops/plan.fops` can naturally reference `/etc/forgeops/templates/...`. Service resources map onto `systemctl`, user resources wrap `useradd/usermod/userdel`, `authorized_key` resources keep SSH keys idempotent (with automatic base64 decoding), filesystem operations manage `/etc/fstab` entries plus `mount`/`umount` steps for both EFS and block devices, `remote_file` fetches artifacts from local paths/S3/HTTP, `rpm` downloads + installs RPMs when they aren’t already present, `timezone` sets `/etc/localtime`, `sysctl` manages kernel tunables, and `cron` manages `/etc/cron.d` jobs. DSL plans can also include additional files via `include 'relative/path.fops'` directives; include paths resolve relative to the parent plan. Resources can coordinate ordering by setting `depends_on => ['user.forgeops']`, ensuring dependent actions run after their prerequisites (and before them during cleanup).
 

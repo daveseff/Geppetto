@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+from string import Template
 
 from .base import Operation
 from ..executors import CommandResult, Executor
+from ..secrets import SecretResolver
 from ..types import ActionResult, HostConfig
 
 
 class ExecOperation(Operation):
     """Run arbitrary commands with simple guards, mirroring Puppet's exec."""
+
+    secret_resolver = SecretResolver()
 
     def __init__(self, spec: dict[str, Any]):
         super().__init__(spec)
@@ -21,21 +25,28 @@ class ExecOperation(Operation):
         raw_command = spec.get("command") or spec.get("cmd")
         if raw_command is None:
             raise ValueError("exec operation requires a command")
-        self.command = self._normalize_command(raw_command)
+        self.raw_command = raw_command
 
-        self.only_if = self._normalize_command(spec["only_if"]) if "only_if" in spec else None
-        self.unless = self._normalize_command(spec["unless"]) if "unless" in spec else None
+        self.only_if = spec.get("only_if")
+        self.unless = spec.get("unless")
 
         self.creates = Path(str(spec["creates"])) if "creates" in spec else None
         self.cwd = Path(str(spec["cwd"])) if "cwd" in spec else None
 
         self.env = self._normalize_env(spec.get("env") or spec.get("environment"))
+        raw_vars = spec.get("variables", {})
+        if raw_vars is not None and not isinstance(raw_vars, dict):
+            raise ValueError("exec variables must be a mapping")
+        self.variables = dict(raw_vars or {})
 
         returns = spec.get("returns", [0])
         self.allowed_returns = self._normalize_returns(returns)
         self.timeout = self._normalize_timeout(spec.get("timeout"))
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
+        context = self.secret_resolver.resolve({**host.variables, **self.variables})
+        command = self._render_and_normalize(self.raw_command, context)
+
         if self.creates:
             creates_path = self._resolve_path(self.creates)
             if creates_path.exists():
@@ -43,19 +54,21 @@ class ExecOperation(Operation):
                 return ActionResult(host=host.name, action="exec", changed=False, details=detail)
 
         if self.only_if:
-            guard = self._run_guard(self.only_if, executor)
+            guard_cmd = self._render_and_normalize(self.only_if, context)
+            guard = self._run_guard(guard_cmd, executor)
             if guard.returncode != 0:
                 detail = f"skipped (only_if rc={guard.returncode})"
                 return ActionResult(host=host.name, action="exec", changed=False, details=detail)
 
         if self.unless:
-            guard = self._run_guard(self.unless, executor)
+            guard_cmd = self._render_and_normalize(self.unless, context)
+            guard = self._run_guard(guard_cmd, executor)
             if guard.returncode == 0:
                 detail = f"skipped (unless rc={guard.returncode})"
                 return ActionResult(host=host.name, action="exec", changed=False, details=detail)
 
         result = executor.run(
-            self.command,
+            command,
             check=False,
             mutable=True,
             env=self.env,
@@ -85,6 +98,15 @@ class ExecOperation(Operation):
             cwd=self.cwd,
             timeout=self.timeout,
         )
+
+    def _render_and_normalize(self, value: Any, context: dict[str, Any]) -> list[str]:
+        if isinstance(value, str):
+            rendered = Template(value).safe_substitute(context)
+            return self._normalize_command(rendered)
+        if isinstance(value, Sequence):
+            rendered = [Template(str(v)).safe_substitute(context) for v in value]
+            return self._normalize_command(rendered)
+        raise ValueError("exec command/guard must be a string or list")
 
     def _resolve_path(self, path: Path) -> Path:
         if path.is_absolute() or self.cwd is None:

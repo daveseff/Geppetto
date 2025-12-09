@@ -54,6 +54,9 @@ class Tokenizer:
             if ch in ("'", '"'):
                 yield self._string()
                 continue
+            if ch.isdigit() or (ch == "-" and self._peek(1).isdigit()):
+                yield self._number()
+                continue
             if ch == "=" and self._peek(1) == ">":
                 start = self.pos
                 start_line, start_col = self.line, self.column
@@ -107,6 +110,15 @@ class Tokenizer:
         while self.pos < self.length and self._is_ident_part(self.text[self.pos]):
             self._advance()
         return Token("IDENT", self.text[start:self.pos], start, start_line, start_col)
+
+    def _number(self) -> Token:
+        start = self.pos
+        start_line, start_col = self.line, self.column
+        if self._peek_char() == "-":
+            self._advance()
+        while self.pos < self.length and self.text[self.pos].isdigit():
+            self._advance()
+        return Token("NUMBER", self.text[start:self.pos], start, start_line, start_col)
 
     def _skip_comment(self) -> None:
         while self.pos < self.length and self.text[self.pos] != "\n":
@@ -254,6 +266,16 @@ class DSLParser:
         if token.type == "STRING":
             self._advance()
             return token.value
+        if token.type == "NUMBER":
+            self._advance()
+            try:
+                return int(token.value)
+            except ValueError:
+                raise DSLParseError(
+                    f"Invalid number '{token.value}'",
+                    line=token.line,
+                    column=token.column,
+                )
         if token.type == "IDENT":
             self._advance()
             lowered = token.value.lower()
@@ -264,6 +286,8 @@ class DSLParser:
             return token.value
         if token.type == "LBRACKET":
             return self._parse_list()
+        if token.type == "LBRACE":
+            return self._parse_map()
         raise DSLParseError(
             f"Unexpected value token '{token.value}'",
             line=token.line,
@@ -278,6 +302,17 @@ class DSLParser:
             self._match("COMMA")
         self._consume("RBRACKET")
         return values
+
+    def _parse_map(self) -> dict[str, object]:
+        mapping: dict[str, object] = {}
+        self._consume("LBRACE")
+        while not self._check("RBRACE"):
+            key_token = self._consume("IDENT") if self._check("IDENT") else self._consume("STRING")
+            self._consume("ARROW")
+            mapping[key_token.value] = self._parse_value()
+            self._match("COMMA")
+        self._consume("RBRACE")
+        return mapping
 
     def _parse_string_like(self) -> str:
         token = self._peek()

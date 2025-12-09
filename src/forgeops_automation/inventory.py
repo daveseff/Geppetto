@@ -35,7 +35,15 @@ class InventoryLoader:
                     plan = Plan(hosts=hosts, tasks=tasks)
         except DSLParseError as exc:
             line = f"{exc.line}:{exc.column}" if exc.line is not None else "?"
-            raise DSLParseError(f"{path}:{line} {exc}") from None
+            snippet = ""
+            try:
+                snippet = self._line_snippet(text if "text" in locals() else path.read_text(), exc.line)
+            except Exception:
+                snippet = ""
+            message = f"{path}:{line} {exc}"
+            if snippet:
+                message = f"{message} -> {snippet}"
+            raise DSLParseError(message) from None
         except tomllib.TOMLDecodeError as exc:
             raise ValueError(f"{path}:{exc.lineno}:{exc.colno} {exc.msg}") from None
 
@@ -108,3 +116,13 @@ class InventoryLoader:
             else:
                 lines.append(line)
         return "\n".join(lines)
+
+    @staticmethod
+    def _line_snippet(text: str, line_number: int | None) -> str:
+        if line_number is None:
+            return ""
+        lines = text.splitlines()
+        idx = line_number - 1
+        if 0 <= idx < len(lines):
+            return lines[idx].strip()
+        return ""
