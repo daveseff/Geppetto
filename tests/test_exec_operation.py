@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 
 from geppetto_automation.executors import LocalExecutor
 from geppetto_automation.operations.exec import ExecOperation
@@ -91,3 +92,14 @@ def test_exec_renders_secrets(monkeypatch, tmp_path: Path) -> None:
 
     assert result.failed is False
     assert target.read_text().strip() == "sekret"
+
+
+def test_exec_logs_command_on_failure(caplog) -> None:
+    host = HostConfig("local")
+    op = ExecOperation({"name": "fail", "command": "exit 9"})
+
+    caplog.set_level(logging.DEBUG, logger="geppetto_automation.operations.exec")
+    result = op.apply(host, LocalExecutor(host))
+
+    assert result.failed is True
+    assert any("cmd=sh -c exit 9" in rec.message for rec in caplog.records)

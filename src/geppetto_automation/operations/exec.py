@@ -3,11 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 from string import Template
+import logging
 
 from .base import Operation
 from ..executors import CommandResult, Executor
 from ..secrets import SecretResolver
 from ..types import ActionResult, HostConfig
+
+logger = logging.getLogger(__name__)
 
 
 class ExecOperation(Operation):
@@ -77,6 +80,13 @@ class ExecOperation(Operation):
         )
 
         if result.returncode not in self.allowed_returns:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "exec failed name=%s rc=%s cmd=%s",
+                    self.name,
+                    result.returncode,
+                    self._format_command(command),
+                )
             detail = self._error_detail(result)
             return ActionResult(
                 host=host.name,
@@ -120,6 +130,10 @@ class ExecOperation(Operation):
         if isinstance(value, Sequence):
             return [str(v) for v in value]
         raise ValueError("exec command must be a string or list")
+
+    @staticmethod
+    def _format_command(command: Sequence[str]) -> str:
+        return " ".join(command)
 
     @staticmethod
     def _normalize_env(value: Any) -> Optional[dict[str, str]]:
