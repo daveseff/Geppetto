@@ -75,3 +75,29 @@ def test_parse_error_has_line_and_column() -> None:
     err = excinfo.value
     assert err.line == 3
     assert err.column is not None
+
+
+def test_on_success_and_failure_blocks_parse() -> None:
+    sample = """
+    task 'demo' on 'local' {
+      exec { 'set-crypto-policy':
+        command => '/usr/bin/update-crypto-policies --set DEFAULT:AD-SUPPORT'
+        on_success => {
+          exec { 'apply_authselect_profile':
+            command => 'authselect apply-changes'
+          }
+        }
+        on_failure => {
+          exec { 'rollback_policy':
+            command => '/usr/bin/update-crypto-policies --set DEFAULT'
+          }
+        }
+      }
+    }
+    """
+    plan = DSLParser().parse_text(sample)
+    action = plan.tasks[0].actions[0]
+    assert len(action.on_success) == 1
+    assert action.on_success[0].data["name"] == "apply_authselect_profile"
+    assert len(action.on_failure) == 1
+    assert action.on_failure[0].data["name"] == "rollback_policy"

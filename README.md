@@ -82,7 +82,7 @@ include 'shared/common.fops'
 
 `exec` runs commands through `/bin/sh -c` when given a string, supports `creates` skip files, `only_if`/`unless` guards, `cwd`, per-command `env` (list of `KEY=value` or a map), allowed `returns` codes, and `timeout` in seconds.
 
-Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks): referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
+Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks) and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
 
 ```
 allowed_hosts:
@@ -130,6 +130,25 @@ filesystem => 'xfs'
 mkfs => true
 }
 
+```
+
+Conditional follow-up actions:
+
+```
+exec { 'set-crypto-policy':
+  command => '/usr/bin/update-crypto-policies --set DEFAULT:AD-SUPPORT'
+  unless  => "/usr/bin/update-crypto-policies --show | /usr/bin/grep -Fq 'AD-SUPPORT'"
+  on_success => {
+    exec { 'apply_authselect_profile':
+      command => 'authselect apply-changes'
+    }
+  }
+  on_failure => {
+    exec { 'rollback_policy':
+      command => '/usr/bin/update-crypto-policies --set DEFAULT'
+    }
+  }
+}
 ```
 
 A generic (non-EFS) network mount:

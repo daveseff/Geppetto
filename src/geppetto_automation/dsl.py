@@ -231,6 +231,8 @@ class DSLParser:
             if resource_type == "file":
                 data.setdefault("path", data["name"])
         depends_on: list[str] = []
+        on_success: list[ActionSpec] = []
+        on_failure: list[ActionSpec] = []
         for key, value in attrs.items():
             if key == "ensure":
                 data.setdefault("state", value)
@@ -239,9 +241,25 @@ class DSLParser:
                     depends_on.extend(str(v) for v in value)
                 else:
                     depends_on.append(str(value))
+            elif key == "on_success":
+                if isinstance(value, list):
+                    on_success = value
+                else:
+                    raise DSLParseError("on_success must be a block of actions")
+            elif key == "on_failure":
+                if isinstance(value, list):
+                    on_failure = value
+                else:
+                    raise DSLParseError("on_failure must be a block of actions")
             else:
                 data[key] = value
-        return ActionSpec(type=resource_type, data=data, depends_on=depends_on)
+        return ActionSpec(
+            type=resource_type,
+            data=data,
+            depends_on=depends_on,
+            on_success=on_success,
+            on_failure=on_failure,
+        )
 
     def _parse_host_list(self) -> list[str]:
         if self._match("LBRACKET"):
@@ -258,7 +276,10 @@ class DSLParser:
         while not self._check("RBRACE"):
             key_token = self._consume("IDENT")
             self._consume("ARROW")
-            attrs[key_token.value] = self._parse_value()
+            if key_token.value in {"on_success", "on_failure"} and self._check("LBRACE"):
+                attrs[key_token.value] = self._parse_action_block_list()
+            else:
+                attrs[key_token.value] = self._parse_value()
         return attrs
 
     def _parse_value(self) -> object:
@@ -302,6 +323,14 @@ class DSLParser:
             self._match("COMMA")
         self._consume("RBRACKET")
         return values
+
+    def _parse_action_block_list(self) -> list[ActionSpec]:
+        actions: list[ActionSpec] = []
+        self._consume("LBRACE")
+        while not self._check("RBRACE"):
+            actions.append(self._parse_resource())
+        self._consume("RBRACE")
+        return actions
 
     def _parse_map(self) -> dict[str, object]:
         mapping: dict[str, object] = {}

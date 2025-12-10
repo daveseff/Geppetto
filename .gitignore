@@ -4,3 +4,4 @@ __pycache__
 payload
 dist
 *.state.json
+debug

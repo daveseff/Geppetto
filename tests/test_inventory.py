@@ -103,3 +103,31 @@ def test_dsl_include(tmp_path: Path) -> None:
     plan = InventoryLoader().load(main)
     assert plan.tasks[0].name == "included"
     assert plan.tasks[0].actions[0].data["name"] == "htop"
+
+
+def test_toml_on_success(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.toml"
+    plan_path.write_text(
+        textwrap.dedent(
+            """
+            [[tasks]]
+            name = "demo"
+            hosts = ["local"]
+
+              [[tasks.actions]]
+              type = "exec"
+              name = "set-policy"
+              command = "true"
+
+                [[tasks.actions.on_success]]
+                type = "exec"
+                name = "apply_authselect_profile"
+                command = "authselect apply-changes"
+            """
+        ).strip()
+    )
+
+    plan = InventoryLoader().load(plan_path)
+    action = plan.tasks[0].actions[0]
+    assert len(action.on_success) == 1
+    assert action.on_success[0].data["name"] == "apply_authselect_profile"

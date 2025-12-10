@@ -72,6 +72,9 @@ class Executor:
     def write_file(self, path: Path, *, content: str, mode: Optional[int]) -> tuple[bool, str]:
         raise NotImplementedError
 
+    def ensure_directory(self, path: Path, *, mode: Optional[int]) -> tuple[bool, str]:
+        raise NotImplementedError
+
     def remove_path(self, path: Path) -> bool:
         raise NotImplementedError
 
@@ -109,6 +112,34 @@ class LocalExecutor(Executor):
         detail = ", ".join(reasons) if reasons else "noop"
         return changed, detail
 
+    def ensure_directory(self, path: Path, *, mode: Optional[int]) -> tuple[bool, str]:  # type: ignore[override]
+        changed = False
+        reasons: list[str] = []
+
+        if not path.exists():
+            changed = True
+            reasons.append("created")
+            if not self.dry_run:
+                path.mkdir(parents=True, exist_ok=True)
+        elif not path.is_dir():
+            changed = True
+            reasons.append("replaced-non-dir")
+            if not self.dry_run:
+                self.remove_path(path)
+                path.mkdir(parents=True, exist_ok=True)
+
+        if mode is not None:
+            existing_mode = self._file_mode(path)
+            if existing_mode != mode:
+                changed = True
+                reasons.append(f"mode->{mode:04o}")
+                if not self.dry_run:
+                    # ``chmod`` fails if the path is absent, so guard it.
+                    if path.exists():
+                        os.chmod(path, mode)
+        detail = ", ".join(reasons) if reasons else "noop"
+        return changed, detail
+
     def remove_path(self, path: Path) -> bool:
         if not path.exists():
             return False
@@ -138,6 +169,9 @@ class AgentExecutor(Executor):
         raise NotImplementedError
 
     def write_file(self, path: Path, *, content: str, mode: Optional[int]) -> tuple[bool, str]:  # type: ignore[override]
+        raise NotImplementedError
+
+    def ensure_directory(self, path: Path, *, mode: Optional[int]) -> tuple[bool, str]:  # type: ignore[override]
         raise NotImplementedError
 
     def remove_path(self, path: Path) -> bool:  # type: ignore[override]

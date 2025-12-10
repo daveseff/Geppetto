@@ -80,29 +80,64 @@ class InventoryLoader:
         for index, task in enumerate(raw_tasks, start=1):
             name = task.get("name", f"task-{index}")
             target_hosts = task.get("hosts") or list(hosts.keys())
-            actions = [InventoryLoader._parse_action(action, index, pos) for pos, action in enumerate(task.get("actions", []), start=1)]
+            actions = [
+                InventoryLoader._parse_action(action, f"{index}.{pos}")
+                for pos, action in enumerate(task.get("actions", []), start=1)
+            ]
             tasks.append(TaskSpec(name=name, hosts=target_hosts, actions=actions))
         return tasks
 
     @staticmethod
-    def _parse_action(action: dict[str, Any], task_index: int, action_index: int) -> ActionSpec:
+    def _parse_action(action: dict[str, Any], action_index: str) -> ActionSpec:
+        return InventoryLoader._parse_action_dict(action, action_index)
+
+    @staticmethod
+    def _parse_action_dict(action: dict[str, Any], action_index: str) -> ActionSpec:
         action_type = action.get("type")
         if not action_type:
-            raise ValueError(f"Task {task_index} action {action_index} is missing a type")
+            raise ValueError(f"Action {action_index} is missing a type")
         depends = action.get("depends_on", [])
         if isinstance(depends, str):
             depends_list = [depends]
         else:
             depends_list = list(depends or [])
-        data = {k: v for k, v in action.items() if k not in {"type", "depends_on"}}
-        return ActionSpec(type=action_type, data=data, depends_on=depends_list)
+        on_success = InventoryLoader._parse_nested_actions(action.get("on_success", []), f"{action_index}.s")
+        on_failure = InventoryLoader._parse_nested_actions(action.get("on_failure", []), f"{action_index}.f")
+        data = {k: v for k, v in action.items() if k not in {"type", "depends_on", "on_success", "on_failure"}}
+        return ActionSpec(
+            type=action_type,
+            data=data,
+            depends_on=depends_list,
+            on_success=on_success,
+            on_failure=on_failure,
+        )
+
+    @staticmethod
+    def _parse_nested_actions(value: Any, action_index: str) -> list[ActionSpec]:
+        if not value:
+            return []
+        items = value if isinstance(value, list) else [value]
+        actions: list[ActionSpec] = []
+        for idx, raw in enumerate(items, start=1):
+            if not isinstance(raw, dict):
+                raise ValueError(f"Action {action_index}.{idx} nested action must be a mapping")
+            actions.append(InventoryLoader._parse_action_dict(raw, f"{action_index}.{idx}"))
+        return actions
 
     @staticmethod
     def _attach_plan_dir(plan: Plan, base_dir: Path) -> None:
         base = str(base_dir)
+
+        def _assign(action: ActionSpec) -> None:
+            action.data.setdefault("_plan_dir", base)
+            for child in action.on_success:
+                _assign(child)
+            for child in action.on_failure:
+                _assign(child)
+
         for task in plan.tasks:
             for action in task.actions:
-                action.data.setdefault("_plan_dir", base)
+                _assign(action)
 
     def _read_with_includes(self, path: Path, seen: Optional[set[Path]] = None) -> str:
         seen = seen or set()

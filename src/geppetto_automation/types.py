@@ -17,6 +17,8 @@ class ActionSpec:
     type: str
     data: dict[str, Any]
     depends_on: list[str] = field(default_factory=list)
+    on_success: list["ActionSpec"] = field(default_factory=list)
+    on_failure: list["ActionSpec"] = field(default_factory=list)
 
 
 @dataclass

@@ -37,51 +37,89 @@ class TaskRunner:
                 raise KeyError(f"Host '{host_name}' is not defined")
             executor = self._executor_for(host)
             for action in ordered_actions:
-                operation_cls = OPERATION_REGISTRY.get(action.type)
-                if not operation_cls:
-                    detail = f"unknown operation '{action.type}'"
-                    logger.warning(detail)
-                    results.append(
-                        ActionResult(
-                            host=host.name,
-                            action=action.type,
-                            changed=False,
-                            details=detail,
-                            failed=True,
-                            resource=self._resource_name(action.data),
-                        )
-                    )
-                    continue
-                operation: Operation = operation_cls(action.data)
-                if self.progress_callback:
-                    try:
-                        self.progress_callback(host, action)
-                    except Exception:  # pragma: no cover
-                        logger.debug("progress callback failed", exc_info=True)
-                try:
-                    result = operation.apply(host, executor)
-                except Exception as exc:  # noqa: BLE001
-                    logger.error(
-                        "action=%s host=%s failed: %s", action.type, host.name, exc, exc_info=True
-                    )
-                    result = ActionResult(
-                        host=host.name,
-                        action=action.type,
-                        changed=False,
-                        details=str(exc),
-                        failed=True,
-                        resource=self._resource_name(action.data),
-                    )
-                else:
-                    if self.state_store and not self.dry_run:
-                        self.state_store.record(host.name, action)
-                logger.debug(
-                    "action=%s host=%s changed=%s", action.type, host.name, result.changed
-                )
-                if result.resource is None:
-                    result.resource = self._resource_name(action.data)
-                results.append(result)
+                results.extend(self._execute_action(action, host, executor))
         return results
+
+    def _execute_action(self, action: ActionSpec, host: HostConfig, executor: Executor) -> list[ActionResult]:
+        results: list[ActionResult] = []
+        operation_cls = OPERATION_REGISTRY.get(action.type)
+        if not operation_cls:
+            detail = f"unknown operation '{action.type}'"
+            logger.warning(detail)
+            result = ActionResult(
+                host=host.name,
+                action=action.type,
+                changed=False,
+                details=detail,
+                failed=True,
+                resource=self._resource_name(action.data),
+            )
+            results.append(result)
+            results.extend(self._run_child_actions(action.on_failure, host, executor))
+            return results
+
+        try:
+            operation: Operation = operation_cls(action.data)
+        except Exception as exc:  # noqa: BLE001
+            self._log_error("operation init failed", action, host, exc)
+            result = ActionResult(
+                host=host.name,
+                action=action.type,
+                changed=False,
+                details=str(exc),
+                failed=True,
+                resource=self._resource_name(action.data),
+            )
+            results.append(result)
+            results.extend(self._run_child_actions(action.on_failure, host, executor))
+            return results
+
+        if self.progress_callback:
+            try:
+                self.progress_callback(host, action)
+            except Exception:  # pragma: no cover
+                logger.debug("progress callback failed", exc_info=True)
+        try:
+            result = operation.apply(host, executor)
+        except Exception as exc:  # noqa: BLE001
+            self._log_error("action failed", action, host, exc)
+            result = ActionResult(
+                host=host.name,
+                action=action.type,
+                changed=False,
+                details=str(exc),
+                failed=True,
+                resource=self._resource_name(action.data),
+            )
+        else:
+            if self.state_store and not self.dry_run:
+                self.state_store.record(host.name, action)
+        logger.debug("action=%s host=%s changed=%s", action.type, host.name, result.changed)
+        if result.resource is None:
+            result.resource = self._resource_name(action.data)
+        results.append(result)
+
+        if not result.failed and result.changed:
+            results.extend(self._run_child_actions(action.on_success, host, executor))
+        elif result.failed:
+            results.extend(self._run_child_actions(action.on_failure, host, executor))
+
+        return results
+
+    def _run_child_actions(self, actions: list[ActionSpec], host: HostConfig, executor: Executor) -> list[ActionResult]:
+        if not actions:
+            return []
+        ordered_actions = self._order_actions(actions)
+        results: list[ActionResult] = []
+        for child in ordered_actions:
+            results.extend(self._execute_action(child, host, executor))
+        return results
+
+    def _log_error(self, message: str, action: ActionSpec, host: HostConfig, exc: Exception) -> None:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.error("action=%s host=%s %s: %s", action.type, host.name, message, exc, exc_info=True)
+        else:
+            logger.error("action=%s host=%s %s: %s", action.type, host.name, message, exc)
 
     def _executor_for(self, host: HostConfig) -> Executor:
         if host.connection == "local":

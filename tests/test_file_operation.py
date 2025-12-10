@@ -28,6 +28,34 @@ def test_file_present_creates_content(tmp_path: Path) -> None:
     assert oct(os.stat(target).st_mode & 0o777) == "0o640"
 
 
+def test_file_directory_creates_and_sets_mode(tmp_path: Path) -> None:
+    target = tmp_path / "config.d"
+    spec = {"path": str(target), "state": "directory", "mode": "0750"}
+    op = FileOperation(spec)
+
+    result = op.apply(HostConfig("local"), build_executor())
+
+    assert result.changed is True
+    assert target.is_dir()
+    assert oct(os.stat(target).st_mode & 0o777) == "0o750"
+
+    # Second run should be idempotent
+    result = op.apply(HostConfig("local"), build_executor())
+    assert result.changed is False
+
+
+def test_file_directory_replaces_existing_file(tmp_path: Path) -> None:
+    target = tmp_path / "config-dir"
+    target.write_text("old")
+    spec = {"path": str(target), "state": "directory"}
+    op = FileOperation(spec)
+
+    result = op.apply(HostConfig("local"), build_executor())
+
+    assert result.changed is True
+    assert target.is_dir()
+
+
 def test_file_absent_removes_files(tmp_path: Path) -> None:
     target = tmp_path / "obsolete.txt"
     target.write_text("old")

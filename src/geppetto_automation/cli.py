@@ -97,7 +97,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         state_store=state_store,
         progress_callback=print_progress,
     )
-    results = runner.run()
+    try:
+        results = runner.run()
+    except Exception as exc:  # noqa: BLE001
+        _clear_progress()
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            raise
+        print(colorize(f"Execution failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
 
     effective_level = logging.getLogger().getEffectiveLevel()
     summary = Summary()

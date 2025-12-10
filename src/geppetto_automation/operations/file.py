@@ -30,8 +30,8 @@ class FileOperation(Operation):
             raise ValueError("file operation requires a path")
         self.path = Path(str(raw_path))
         self.state = str(spec.get("state", "present"))
-        if self.state not in {"present", "absent"}:
-            raise ValueError("file operation state must be 'present' or 'absent'")
+        if self.state not in {"present", "absent", "directory"}:
+            raise ValueError("file operation state must be 'present', 'absent', or 'directory'")
         raw_content = spec.get("content")
         self.content = "" if raw_content is None else str(raw_content)
         self.mode = self._parse_mode(spec.get("mode"))
@@ -51,13 +51,15 @@ class FileOperation(Operation):
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         if self.link_target:
             return self._apply_symlink(host, executor)
-        if self.state == "present":
-            content = self._render_content(host)
-            changed, detail = executor.write_file(self.path, content=content, mode=self.mode)
-        else:
+        if self.state == "directory":
+            changed, detail = executor.ensure_directory(self.path, mode=self.mode)
+        elif self.state == "absent":
             removed = executor.remove_path(self.path)
             detail = "removed" if removed else "noop"
             changed = removed
+        else:
+            content = self._render_content(host)
+            changed, detail = executor.write_file(self.path, content=content, mode=self.mode)
         return ActionResult(host=host.name, action="file", changed=changed, details=detail)
 
     def _render_content(self, host: HostConfig) -> str:
