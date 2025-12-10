@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "forgeops-automation"
+name = "geppetto-automation"
 version = "0.0.4"
-description = "Lightweight systems automation toolkit for ForgeOps"
+description = "Lightweight systems automation toolkit for Geppetto"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{name = "Dave Seff", email = "dave@seff.com.au"}]
@@ -32,4 +32,4 @@ dev = [
 ]
 
 [project.scripts]
-forgeops-auto = "forgeops_automation.cli:main"
+geppetto-auto = "geppetto_automation.cli:main"

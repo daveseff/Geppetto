@@ -1,8 +1,8 @@
 task 'jumpbox-users' on ['jumpbox'] {
-  user { 'forgeops':
+  user { 'geppetto':
     shell    => '/bin/bash'
     locked   => true
     system   => false
-    comment  => 'ForgeOps service user'
+    comment  => 'Geppetto service user'
   }
 }

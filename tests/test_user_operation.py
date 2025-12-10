@@ -1,5 +1,5 @@
-from forgeops_automation.operations.user import UserInfo, UserManager, UserOperation
-from forgeops_automation.types import HostConfig
+from geppetto_automation.operations.user import UserInfo, UserManager, UserOperation
+from geppetto_automation.types import HostConfig
 
 
 class FakeManager(UserManager):

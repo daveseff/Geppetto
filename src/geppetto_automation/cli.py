@@ -35,13 +35,13 @@ _last_progress_len = 0
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="ForgeOps automation runner")
+    parser = argparse.ArgumentParser(description="Geppetto automation runner")
     parser.add_argument(
         "plan",
         nargs="?",
         default=None,
         type=Path,
-        help="Path to a plan file (default from config or /etc/forgeops/plan.fops)",
+        help="Path to a plan file (default from config or /etc/geppetto/plan.fops)",
     )
     parser.add_argument(
         "--state-file",
@@ -51,8 +51,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("/etc/forgeops/main.conf"),
-        help="Path to forgeops config file (default: /etc/forgeops/main.conf)",
+        default=Path("/etc/geppetto/main.conf"),
+        help="Path to geppetto config file (default: /etc/geppetto/main.conf)",
     )
     parser.add_argument("--dry-run", action="store_true", help="Calculate changes without executing")
     parser.add_argument(

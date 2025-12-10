@@ -2,12 +2,12 @@ from pathlib import Path
 
 import os
 
-from forgeops_automation.operations.authorized_key import (
+from geppetto_automation.operations.authorized_key import (
     AuthorizedKeyManager,
     AuthorizedKeyOperation,
     UserRecord,
 )
-from forgeops_automation.types import HostConfig
+from geppetto_automation.types import HostConfig
 
 
 class FakeManager(AuthorizedKeyManager):

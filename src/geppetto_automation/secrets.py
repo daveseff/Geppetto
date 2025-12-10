@@ -48,8 +48,14 @@ class SecretResolver:
 
         value: Any = secret_str
         if key is not None:
-            payload = json.loads(secret_str)
-            value = payload[str(key)]
+            try:
+                payload = json.loads(secret_str)
+                if str(key) not in payload:
+                    raise KeyError(f"Key '{key}' not found in secret {name}")
+                value = payload[str(key)]
+            except json.JSONDecodeError:
+                # Secret is plain text; fall back to entire value
+                value = secret_str
 
         self._cache[cache_key] = value
         return value

@@ -1,0 +1,34 @@
+[sssd]
+config_file_version = 2
+domains = {{ domain_fqdn }}
+services = nss, pam
+
+[nss]
+allowed_shells = /bin/bash
+vetoed_shells = /bin/sh
+shell_fallback = /bin/bash
+
+[pam]
+offline_credentials_expiration = 2
+offline_failed_login_attempts = 3
+offline_failed_login_delay = 5
+
+[domain/{{ domain_fqdn }}]
+id_provider = ad
+auth_provider = ad
+chpass_provider = ad
+access_provider = ad
+cache_credentials = True
+default_shell = /bin/bash
+fallback_homedir = /home/%u
+enumerate = False
+cache_credentials = True
+
+dyndns_update = True
+dyndns_refresh_interval = 43200
+dyndns_update_ptr = True
+dyndns_ttl = 3600
+ad_gpo_access_control = disabled
+
+ldap_id_mapping = True
+ad_access_filter = DOM:{{ domain_fqdn }}:(&(objectCategory=user)(objectClass=user)(|(memberOf:1.2.840.113556.1.4.1941:=CN=sl-linux-syseng,OU=Right Groups,OU=Groups,DC=racqgroup,DC=local)(memberOf:1.2.840.113556.1.4.1941:=CN=sl-linux-sysops,OU=Right Groups,OU=Groups,DC=racqgroup,DC=local)(memberOf:1.2.840.113556.1.4.1941:=CN=sl-linux-{{ role }},OU=Right Groups,OU=Groups,DC=racqgroup,DC=local){% if additional_admin_groups %}{% for ad_group in additional_admin_groups %}(memberOf:1.2.840.113556.1.4.1941:=CN=sl-linux-{{ ad_group }},OU=Right Groups,OU=Groups,DC=racqgroup,DC=local){% endfor %}{% endif %}))

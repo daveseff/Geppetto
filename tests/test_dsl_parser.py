@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from forgeops_automation.dsl import DSLParseError, DSLParser
+from geppetto_automation.dsl import DSLParseError, DSLParser
 
 
 def test_parses_simple_plan(tmp_path: Path) -> None:
@@ -16,7 +16,7 @@ def test_parses_simple_plan(tmp_path: Path) -> None:
         ensure => present
       }
 
-      file { '/tmp/forgeops-motd':
+      file { '/tmp/geppetto-motd':
         ensure  => present
         mode    => '0644'
       }
@@ -27,7 +27,7 @@ def test_parses_simple_plan(tmp_path: Path) -> None:
     assert plan.tasks[0].actions[0].type == "package"
     assert plan.tasks[0].actions[0].data["packages"] == ["git", "python3"]
     assert plan.tasks[0].actions[1].data["mode"] == "0644"
-    assert plan.tasks[0].actions[1].data["path"] == "/tmp/forgeops-motd"
+    assert plan.tasks[0].actions[1].data["path"] == "/tmp/geppetto-motd"
 
 
 def test_non_package_list_title_raises() -> None:

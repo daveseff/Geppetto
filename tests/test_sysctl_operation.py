@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from forgeops_automation.operations.sysctl import SysctlOperation
-from forgeops_automation.types import HostConfig
+from geppetto_automation.operations.sysctl import SysctlOperation
+from geppetto_automation.types import HostConfig
 
 
 class RecordingExecutor:

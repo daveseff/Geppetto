@@ -1,5 +1,5 @@
-from forgeops_automation import runner as runner_mod
-from forgeops_automation.types import ActionResult, ActionSpec, HostConfig, Plan, TaskSpec
+from geppetto_automation import runner as runner_mod
+from geppetto_automation.types import ActionResult, ActionSpec, HostConfig, Plan, TaskSpec
 
 
 class DummyOperation:
@@ -41,19 +41,19 @@ def test_runner_honors_depends_on(monkeypatch):
 
     hosts = {"local": HostConfig(name="local")}
     actions = [
-        ActionSpec(type="record", data={"name": "user.forgeops"}, depends_on=[]),
+        ActionSpec(type="record", data={"name": "user.geppetto"}, depends_on=[]),
         ActionSpec(
             type="record",
-            data={"name": "authorized_key.forgeops-admin"},
-            depends_on=["record.user.forgeops"],
+            data={"name": "authorized_key.geppetto-admin"},
+            depends_on=["record.user.geppetto"],
         ),
     ]
     task = TaskSpec(name="demo", hosts=["local"], actions=actions)
     plan = Plan(hosts=hosts, tasks=[task])
 
-    monkeypatch.setattr("forgeops_automation.runner.OPERATION_REGISTRY", {"record": RecordingOperation})
+    monkeypatch.setattr("geppetto_automation.runner.OPERATION_REGISTRY", {"record": RecordingOperation})
 
     runner = runner_mod.TaskRunner(plan)
     runner.run()
 
-    assert order == ["user.forgeops", "authorized_key.forgeops-admin"]
+    assert order == ["user.geppetto", "authorized_key.geppetto-admin"]

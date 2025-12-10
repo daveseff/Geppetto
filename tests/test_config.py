@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from forgeops_automation.config import ForgeOpsConfig, load_config
+from geppetto_automation.config import GeppettoConfig, load_config
 
 
 def test_load_config_defaults(tmp_path: Path) -> None:
     config = load_config(tmp_path / "missing.conf")
-    assert isinstance(config, ForgeOpsConfig)
-    assert config.plan == Path("/etc/forgeops/plan.fops")
+    assert isinstance(config, GeppettoConfig)
+    assert config.plan == Path("/etc/geppetto/plan.fops")
 
 
 def test_load_config_overrides(tmp_path: Path) -> None:
@@ -14,17 +14,17 @@ def test_load_config_overrides(tmp_path: Path) -> None:
     cfg_path.write_text(
         """
         [defaults]
-        plan = "/opt/forgeops/plan.fops"
-        state_file = "/var/lib/forgeops/state.json"
-        template_dir = "/opt/forgeops/templates"
+        plan = "/opt/geppetto/plan.fops"
+        state_file = "/var/lib/geppetto/state.json"
+        template_dir = "/opt/geppetto/templates"
         aws_region = "ap-southeast-2"
         aws_profile = "myprofile"
         """
     )
 
     config = load_config(cfg_path)
-    assert config.plan == Path("/opt/forgeops/plan.fops")
-    assert config.state_file == Path("/var/lib/forgeops/state.json")
-    assert config.template_dir == Path("/opt/forgeops/templates")
+    assert config.plan == Path("/opt/geppetto/plan.fops")
+    assert config.state_file == Path("/var/lib/geppetto/state.json")
+    assert config.template_dir == Path("/opt/geppetto/templates")
     assert config.aws_region == "ap-southeast-2"
     assert config.aws_profile == "myprofile"

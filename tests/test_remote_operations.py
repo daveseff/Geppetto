@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from forgeops_automation.executors import CommandResult, Executor
-from forgeops_automation.operations.remote import RemoteFileOperation, RpmInstallOperation
-from forgeops_automation.types import HostConfig
+from geppetto_automation.executors import CommandResult, Executor
+from geppetto_automation.operations.remote import RemoteFileOperation, RpmInstallOperation
+from geppetto_automation.types import HostConfig
 
 
 class RecordingExecutor(Executor):
@@ -76,7 +76,7 @@ def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):
         def cleanup(path: Path) -> None:  # noqa: ARG002
             pass
 
-    monkeypatch.setattr("forgeops_automation.operations.remote.RemoteFetcher", StubFetcher)
+    monkeypatch.setattr("geppetto_automation.operations.remote.RemoteFetcher", StubFetcher)
 
     responses = {
         ("rpm", "-q", "mypkg"): [CommandResult(["rpm"], "", "", 1)],

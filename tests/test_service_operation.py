@@ -1,5 +1,5 @@
-from forgeops_automation.operations.service import ServiceOperation
-from forgeops_automation.types import HostConfig
+from geppetto_automation.operations.service import ServiceOperation
+from geppetto_automation.types import HostConfig
 
 
 class FakeSystemCtl:

@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from forgeops_automation.inventory import InventoryLoader
-from forgeops_automation.runner import TaskRunner
-from forgeops_automation.state import StateStore
-from forgeops_automation.types import HostConfig
+from geppetto_automation.inventory import InventoryLoader
+from geppetto_automation.runner import TaskRunner
+from geppetto_automation.state import StateStore
+from geppetto_automation.types import HostConfig
 
 PLAN_TEMPLATE = """
 node 'local' {

@@ -1,5 +1,5 @@
-from forgeops_automation import cli
-from forgeops_automation.types import ActionResult
+from geppetto_automation import cli
+from geppetto_automation.types import ActionResult
 
 
 def test_format_result_failed(monkeypatch):

@@ -1,10 +1,10 @@
 from pathlib import Path
 import os
 
-from forgeops_automation.executors import LocalExecutor
-from forgeops_automation.operations.file import FileOperation
-from forgeops_automation import secrets as secret_module
-from forgeops_automation.types import HostConfig
+from geppetto_automation.executors import LocalExecutor
+from geppetto_automation.operations.file import FileOperation
+from geppetto_automation import secrets as secret_module
+from geppetto_automation.types import HostConfig
 
 
 def build_executor() -> LocalExecutor:
@@ -81,13 +81,13 @@ def test_file_template_renders_host_variables(tmp_path: Path, monkeypatch) -> No
         "template": str(template),
         "variables": {"env": "Dev"},
     }
-    host = HostConfig(name="local", variables={"name": "ForgeOps"})
+    host = HostConfig(name="local", variables={"name": "Geppetto"})
     op = FileOperation(spec)
 
     result = op.apply(host, build_executor())
 
     assert result.changed is True
-    assert target.read_text() == "Hello ForgeOps from Dev"
+    assert target.read_text() == "Hello Geppetto from Dev"
 
 
 def test_file_template_renders_jinja_loop(tmp_path: Path) -> None:
@@ -112,6 +112,30 @@ def test_file_template_renders_jinja_loop(tmp_path: Path) -> None:
 
     assert result.changed is True
     assert "a.example" in target.read_text()
+
+
+def test_file_template_missing_jinja_var_is_empty(tmp_path: Path) -> None:
+    template = tmp_path / "optional.j2"
+    template.write_text(
+        "primary = {{ primary_group }}\n"
+        "{% if additional_admin_groups %}"
+        "admins = {{ additional_admin_groups|join(',') }}\n"
+        "{% endif %}"
+    )
+    target = tmp_path / "out.txt"
+    spec = {
+        "path": str(target),
+        "state": "present",
+        "template": str(template),
+        "variables": {"primary_group": "wheel"},
+    }
+    host = HostConfig(name="local")
+    op = FileOperation(spec)
+
+    result = op.apply(host, build_executor())
+
+    assert result.changed is True
+    assert "primary = wheel" in target.read_text()
 
 
 def test_file_template_renders_secret(monkeypatch, tmp_path: Path) -> None:

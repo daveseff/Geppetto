@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from forgeops_automation.executors import LocalExecutor
-from forgeops_automation.operations.cron import CronOperation
-from forgeops_automation.types import HostConfig
+from geppetto_automation.executors import LocalExecutor
+from geppetto_automation.operations.cron import CronOperation
+from geppetto_automation.types import HostConfig
 
 
 def test_cron_writes_file(tmp_path: Path) -> None:

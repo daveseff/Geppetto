@@ -1,0 +1,25 @@
+task 'jumpbox-packages' on ['jumpbox'] {
+  package { [
+      'awscli-2',
+      'jq',
+      'rsync',
+      'chrony',
+      'cronie',
+      'sendmail',
+      'mlocate',
+      'libnsl',
+      'java-11-amazon-corretto-devel',
+      'unzip',
+      'amazon-efs-utils',
+      'rpm-build'
+    ]:
+    ensure => present
+  }
+}
+
+task 'java-pkg' on ['jumpbox'] {
+  rpm { 'java11':
+    name       => 'java-11-amazon-corretto-devel'
+    source     => 's3://racqi-648034533017-filerepo-readonly/packages/RPM/java-11-amazon-corretto-devel-11.0.28.6-1.x86_64.rpm'
+  }
+}

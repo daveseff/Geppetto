@@ -1,0 +1,68 @@
+task 'Active-Directory' on ['jumpbox'] {
+  package { [
+        'sssd',
+        'realmd',
+        'adcli',
+        'oddjob-mkhomedir',
+        'krb5-workstation'
+    ]:
+    ensure => present
+  }
+
+
+  #Remove humans from local files
+  exec { 'humans_passwd':
+    command  => "/bin/sed -i '/^U/d' /etc/passwd"
+    only_if  => "/bin/grep '^U' /etc/passwd"
+    timeout  => 10
+  }
+
+  exec { 'humans_shadow':
+    command  => "/bin/sed -i '/^U/d' /etc/shadow"
+    only_if  => "/bin/grep '^U' /etc/shadow"
+    timeout  => 10
+  }
+
+  exec { 'humans_group':
+    command  => "/bin/sed -i '/^U/d' /etc/group"
+    only_if  => "/bin/grep '^U' /etc/group"
+    timeout  => 10
+  }
+
+  file { '/etc/krb5.conf':
+    ensure  => present
+    mode    => '0644'
+    template => 'templates/krb5.conf.tmpl'
+  }
+
+  file { '/etc/sssd/sssd.conf':
+    ensure  => present
+    mode    => '0600'
+    template => 'templates/sssd.conf.tmpl'
+  }
+
+  exec { 'initialize-kerberos':
+    command => "/bin/echo ${register_password} | /bin/kinit ${register_account}"
+    only_if => '/bin/klist -l | /bin/grep -E "Expired|No credentials cache"'
+    unless  => '/bin/klist -l | /bin/grep -E "KEYRING:persistent"'
+    depends_on => ['file./etc/sssd/sssd.conf']
+  }
+
+  exec { 'net-ads-join':
+    command => "/bin/net ads join -U ${register_account}%${register_password} -k createcomputer=\"${createcomputer}\""
+    unless  => '/bin/net ads testjoin -k'
+    depends_on => ['exec.initialize-kerberos']
+  }
+
+  exec { 'pam-sss-config':
+    command => '/sbin/authconfig --update --enablesssd --enablesssdauth'
+    unless  => '/bin/grep sss /etc/pam.d/system-auth > /dev/null 2>&1'
+    depends_on => ['exec.initialize-kerberos']
+  }
+
+  exec { 'pam-homedir-config':
+    command => '/sbin/authconfig --update --enablemkhomedir'
+    unless  => '/bin/grep mkhomedir /etc/pam.d/system-auth > /dev/null 2>&1'
+    depends_on => ['exec.initialize-kerberos']
+  }
+}

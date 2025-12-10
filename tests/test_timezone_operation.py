@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from forgeops_automation.operations.timezone import TimezoneOperation
-from forgeops_automation.types import HostConfig
-from forgeops_automation.executors import LocalExecutor
+from geppetto_automation.operations.timezone import TimezoneOperation
+from geppetto_automation.types import HostConfig
+from geppetto_automation.executors import LocalExecutor
 
 
 def test_timezone_creates_symlink(tmp_path: Path) -> None:

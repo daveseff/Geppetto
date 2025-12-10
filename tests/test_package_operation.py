@@ -1,9 +1,9 @@
 import pytest
 
-from forgeops_automation.executors import LocalExecutor
-from forgeops_automation.operations import package as pkg
-from forgeops_automation.operations.package import PackageManager
-from forgeops_automation.types import HostConfig
+from geppetto_automation.executors import LocalExecutor
+from geppetto_automation.operations import package as pkg
+from geppetto_automation.operations.package import PackageManager
+from geppetto_automation.types import HostConfig
 
 
 class FakePackageManager(PackageManager):

@@ -10,11 +10,11 @@ except ModuleNotFoundError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
 
 
-DEFAULT_PLAN = Path("/etc/forgeops/plan.fops")
+DEFAULT_PLAN = Path("/etc/geppetto/plan.fops")
 
 
 @dataclass
-class ForgeOpsConfig:
+class GeppettoConfig:
     plan: Path = DEFAULT_PLAN
     state_file: Optional[Path] = None
     template_dir: Optional[Path] = None
@@ -22,9 +22,9 @@ class ForgeOpsConfig:
     aws_profile: Optional[str] = None
 
 
-def load_config(path: Path) -> ForgeOpsConfig:
+def load_config(path: Path) -> GeppettoConfig:
     if not path.exists():
-        return ForgeOpsConfig()
+        return GeppettoConfig()
     data = tomllib.loads(path.read_text())
     defaults = data.get("defaults", {})
     plan = Path(defaults.get("plan", DEFAULT_PLAN))
@@ -32,7 +32,7 @@ def load_config(path: Path) -> ForgeOpsConfig:
     template_dir = defaults.get("template_dir")
     aws_region = defaults.get("aws_region")
     aws_profile = defaults.get("aws_profile")
-    return ForgeOpsConfig(
+    return GeppettoConfig(
         plan=Path(plan),
         state_file=Path(state_file) if state_file else None,
         template_dir=Path(template_dir) if template_dir else None,

@@ -3,7 +3,7 @@ import textwrap
 
 import pytest
 
-from forgeops_automation.inventory import InventoryLoader
+from geppetto_automation.inventory import InventoryLoader
 
 
 def test_loads_default_local_host(tmp_path: Path) -> None:

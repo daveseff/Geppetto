@@ -114,7 +114,7 @@ class FileOperation(Operation):
 
     def _render_jinja(self, template_text: str, host: HostConfig) -> str:
         assert jinja2 is not None  # For mypy/static checkers
-        env = jinja2.Environment(undefined=jinja2.StrictUndefined, autoescape=False)
+        env = jinja2.Environment(undefined=jinja2.Undefined, autoescape=False)
         tmpl = env.from_string(template_text)
         context: dict[str, object] = dict(host.variables)
         context.update(self.variables)

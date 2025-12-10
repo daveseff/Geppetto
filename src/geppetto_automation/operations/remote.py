@@ -17,7 +17,7 @@ class RemoteFetcher:
         self.executor = executor
 
     def fetch(self, source: str) -> Path:
-        tmp_fd, tmp_name = tempfile.mkstemp(prefix="forgeops-fetch-")
+        tmp_fd, tmp_name = tempfile.mkstemp(prefix="geppetto-fetch-")
         os.close(tmp_fd)
         tmp_path = Path(tmp_name)
         if source.startswith("s3://"):

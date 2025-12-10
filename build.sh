@@ -2,11 +2,17 @@
 
 PAYLOAD=payload
 rm -rf "$PAYLOAD"
-mkdir -p "$PAYLOAD/usr"
-mkdir -p "$PAYLOAD/etc/forgeops"
-pip install dist/forgeops_automation-0.1.0-py3-none-any.whl --prefix "$PAYLOAD/usr"
+mkdir -p "$PAYLOAD/usr" "$PAYLOAD/usr/bin" "$PAYLOAD/etc/geppetto"
 
-cp scripts/forgeops-auto "$PAYLOAD/usr/bin/"
-chmod 755 "$PAYLOAD/usr/bin/forgeops-auto"
+wheel=$(ls -1t dist/geppetto_automation-*.whl 2>/dev/null | head -n1)
+if [[ -z "$wheel" ]]; then
+  echo "Unable to locate built geppetto_automation wheel in dist/" >&2
+  exit 1
+fi
 
-cp examples/base_plan.fops "$PAYLOAD/etc/forgeops/"
+pip install "$wheel" --prefix "$PAYLOAD/usr"
+
+cp scripts/geppetto-auto "$PAYLOAD/usr/bin/"
+chmod 755 "$PAYLOAD/usr/bin/geppetto-auto"
+
+cp examples/base_plan.fops "$PAYLOAD/etc/geppetto/"

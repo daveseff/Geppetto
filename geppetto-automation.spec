@@ -1,10 +1,10 @@
-Name:           forgeops_automation
+Name:           geppetto_automation
 Version:        0.0.4
 Release:        1%{?dist}
-Summary:        ForgeOps automation tools
+Summary:        Geppetto automation tools
 
 License:        MIT
-URL:            https://example.invalid/forgeops-automation
+URL:            https://example.invalid/geppetto-automation
 Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 
@@ -18,7 +18,7 @@ Requires:       python3dist(boto3) >= 1.34
 Requires:       python3dist(tomli)
 
 %description
-Lightweight systems automation toolkit for ForgeOps.
+Lightweight systems automation toolkit for Geppetto.
 
 %prep
 %autosetup -n %{name}-%{version}
@@ -28,13 +28,13 @@ Lightweight systems automation toolkit for ForgeOps.
 
 %install
 %pyproject_install
-%pyproject_save_files forgeops_automation
+%pyproject_save_files geppetto_automation
 
 %files -f %{pyproject_files}
-%{_bindir}/forgeops-auto
+%{_bindir}/geppetto-auto
 %doc README.md
 %license LICENSE
 
 %changelog
-* Wed Feb 12 2025 ForgeOps Maintainers <noreply@example.invalid> - 0.1.0-1
+* Wed Feb 12 2025 Geppetto Maintainers <noreply@example.invalid> - 0.1.0-1
 - Initial package

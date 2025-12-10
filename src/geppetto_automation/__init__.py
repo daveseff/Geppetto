@@ -1,4 +1,4 @@
-"""ForgeOps systems automation toolkit."""
+"""Geppetto systems automation toolkit."""
 
 from .runner import TaskRunner
 from .inventory import InventoryLoader

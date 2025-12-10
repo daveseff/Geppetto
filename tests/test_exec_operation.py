@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from forgeops_automation.executors import LocalExecutor
-from forgeops_automation.operations.exec import ExecOperation
-from forgeops_automation import secrets as secret_module
-from forgeops_automation.types import HostConfig
+from geppetto_automation.executors import LocalExecutor
+from geppetto_automation.operations.exec import ExecOperation
+from geppetto_automation import secrets as secret_module
+from geppetto_automation.types import HostConfig
 
 
 def test_exec_runs_command(tmp_path: Path) -> None:

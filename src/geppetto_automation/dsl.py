@@ -8,7 +8,7 @@ from .types import ActionSpec, HostConfig, Plan, TaskSpec
 
 
 class DSLParseError(ValueError):
-    """Raised when the ForgeOps DSL cannot be parsed."""
+    """Raised when the Geppetto DSL cannot be parsed."""
 
     def __init__(self, message: str, line: Optional[int] = None, column: Optional[int] = None):
         super().__init__(message)

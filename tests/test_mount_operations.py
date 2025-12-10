@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from forgeops_automation.executors import CommandResult, Executor
-from forgeops_automation.operations.mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
-from forgeops_automation.types import HostConfig
+from geppetto_automation.executors import CommandResult, Executor
+from geppetto_automation.operations.mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
+from geppetto_automation.types import HostConfig
 
 
 class FakeExecutor(Executor):
@@ -96,7 +96,7 @@ def test_block_device_resolves_volume_id(tmp_path: Path, monkeypatch):
         return [device_path]
 
     monkeypatch.setattr(
-        "forgeops_automation.operations.mount.BlockDeviceMountOperation._candidate_paths",
+        "geppetto_automation.operations.mount.BlockDeviceMountOperation._candidate_paths",
         fake_candidates,
     )
 
