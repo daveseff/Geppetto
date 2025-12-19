@@ -230,6 +230,34 @@ Current workflow (no helper scripts):
 
 The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto-automation.spec` before building.
 
+### Debian/Ubuntu packaging (quick path)
+
+A simple fpm-based build (no distro-native packaging files yet):
+
+```bash
+python3 -m pip install --upgrade build fpm  # once per machine
+python3 -m build --sdist
+fpm -s python -t deb --no-python-dependencies \
+  --name geppetto-automation \
+  dist/geppetto-automation-*.tar.gz
+```
+
+The command emits a `.deb` in the current directory. Install with `sudo dpkg -i geppetto-automation_*.deb`.
+
+### Arch Linux packaging (quick path)
+
+Similarly, fpm can spit out a `.pkg.tar.zst`:
+
+```bash
+python3 -m pip install --upgrade build fpm  # once per machine
+python3 -m build --sdist
+fpm -s python -t pacman --no-python-dependencies \
+  --name geppetto-automation \
+  dist/geppetto-automation-*.tar.gz
+```
+
+Install with `sudo pacman -U geppetto-automation-*.pkg.tar.zst`. For a full PKGBUILD, mirror the same sdist and install targets.
+
 ## Extending toward agents or server mode
 
 - Executors live in `src/geppetto_automation/executors.py`. Implement a subclass that knows how to talk to your agent (gRPC, SSH, message bus, etc.) and return it from `TaskRunner._executor_for` for connection types such as `agent` or `server`.
