@@ -78,6 +78,10 @@ class Executor:
     def remove_path(self, path: Path) -> bool:
         raise NotImplementedError
 
+    def set_ownership(self, path: Path, *, uid: Optional[int], gid: Optional[int]) -> tuple[bool, str]:
+        """Set ownership on path; return (changed, detail)."""
+        raise NotImplementedError
+
 
 class LocalExecutor(Executor):
     """Executor that acts directly on the local host."""
@@ -150,6 +154,30 @@ class LocalExecutor(Executor):
         else:
             path.unlink()
         return True
+
+    def set_ownership(self, path: Path, *, uid: Optional[int], gid: Optional[int]) -> tuple[bool, str]:  # type: ignore[override]
+        if uid is None and gid is None:
+            return False, "noop"
+        if not path.exists():
+            return False, "missing"
+
+        stat_result = path.lstat()
+        current_uid, current_gid = stat_result.st_uid, stat_result.st_gid
+        target_uid = uid if uid is not None else current_uid
+        target_gid = gid if gid is not None else current_gid
+
+        changes: list[str] = []
+        if current_uid != target_uid:
+            changes.append(f"uid->{target_uid}")
+        if current_gid != target_gid:
+            changes.append(f"gid->{target_gid}")
+
+        if not changes:
+            return False, "noop"
+
+        if not self.dry_run:
+            os.lchown(path, target_uid, target_gid)
+        return True, ", ".join(changes)
 
     @staticmethod
     def _file_mode(path: Path) -> Optional[int]:

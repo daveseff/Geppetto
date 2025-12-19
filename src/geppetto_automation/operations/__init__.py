@@ -10,6 +10,8 @@ from .sysctl import SysctlOperation
 from .timezone import TimezoneOperation
 from .user import UserOperation
 from .exec import ExecOperation
+from .limits import LimitsOperation
+from .profile_env import ProfileEnvOperation
 
 OPERATION_REGISTRY = {
     "package": PackageOperation,
@@ -26,6 +28,8 @@ OPERATION_REGISTRY = {
     "sysctl": SysctlOperation,
     "cron": CronOperation,
     "exec": ExecOperation,
+    "limits": LimitsOperation,
+    "profile_env": ProfileEnvOperation,
 }
 
 __all__ = [
@@ -44,5 +48,7 @@ __all__ = [
     "SysctlOperation",
     "CronOperation",
     "ExecOperation",
+    "LimitsOperation",
+    "ProfileEnvOperation",
     "OPERATION_REGISTRY",
 ]

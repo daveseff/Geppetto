@@ -10,11 +10,10 @@
 [x] In the output, print the name of the resource , for example  local::user someuser - ok - noop
 [x] Configuration - Add an /etc/geppetto/main.conf so that users can define default directories, state file locations, etc...
 [x] Includes - Plans should be able to get separated into separate files and have the option to get "included" into other plan files.
-Symlink management – extend the file operation (or add a dedicated resource) so plans can create/manage symbolic links, not just regular files.
-Timezone resource – add a `timezone` operation so plans can declare the desired zone (e.g. zone => 'Australia/Brisbane') instead of hand-managing symlinks.
-Cron resource – add an operation to manage cron jobs (system/user crontabs) declaratively.
-File ownership/group management – extend the file operation with `owner`/`group` attributes so plans can set POSIX ownership along with mode/content.
-Sysctl resource – manage kernel tunables (sysctl) declaratively with optional persistence.
-Limits resource – manage /etc/security/limits.d entries for users/services.
-Banner resource – manage login/MOTD/SSH banners consistently.
-Profile/env resource – manage environment exports in /etc/profile.d or systemd drop-ins.
+[x] Symlink management – extend the file operation (or add a dedicated resource) so plans can create/manage symbolic links, not just regular files.
+[x] Timezone resource – add a `timezone` operation so plans can declare the desired zone (e.g. zone => 'Australia/Brisbane') instead of hand-managing symlinks.
+[x] Cron resource – add an operation to manage cron jobs (system/user crontabs) declaratively.
+[x] File ownership/group management – extend the file operation with `owner`/`group` attributes so plans can set POSIX ownership along with mode/content.
+[x] Sysctl resource – manage kernel tunables (sysctl) declaratively with optional persistence.
+[x] Limits resource – manage /etc/security/limits.d entries for users/services.
+[x] Profile/env resource – manage environment exports in /etc/profile.d or systemd drop-ins.
