@@ -1,9 +1,3 @@
-node 'jumpbox' {
-  connection  => local
-  environment => 'staging'
-}
-
-include 'includes/packages.fops'
-include 'includes/mounts.fops'
-include 'includes/users.fops'
-include 'includes/keys.fops'
+# Example entrypoint that delegates to the host-specific plan under config/.
+# Keep this path stable for docs/CLI samples.
+include 'config/hosts/host1/plan.fops'

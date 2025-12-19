@@ -1,0 +1,15 @@
+node 'host1' {
+  connection  => local
+  environment => 'staging'
+}
+
+# Defaults common to all hosts
+include '../../defaults/packages.fops'
+include '../../defaults/users.fops'
+
+# Group-level overlays (staging)
+include '../../groups/staging/mounts.fops'
+include '../../groups/staging/execs.fops'
+
+# Host-specific bits
+include 'keys.fops'

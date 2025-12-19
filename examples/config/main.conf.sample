@@ -3,7 +3,7 @@
 
 [defaults]
 # Path to the default plan file (.fops or .toml)
-plan = "/etc/geppetto/plan.fops"
+plan = "/etc/geppetto/config/hosts/host1/plan.fops"
 
 # Location for state data (used to clean up resources removed from the plan).
 # If omitted, the state file defaults to <plan>.state.json.
@@ -11,4 +11,4 @@ state_file = "/var/lib/geppetto/state.json"
 
 # Base directory for relative templates (optional). When set, template references
 # like template => "templates/motd.tmpl" resolve under this directory.
-template_dir = "/etc/geppetto/templates"
+template_dir = "/etc/geppetto/config/templates"

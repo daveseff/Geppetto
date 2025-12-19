@@ -1,4 +1,4 @@
-task 'jumpbox-packages' on ['jumpbox'] {
+task 'host1-packages' on ['host1'] {
   package { [
       'awscli',
       'jq',

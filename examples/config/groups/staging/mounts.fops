@@ -1,4 +1,4 @@
-task 'jumpbox-mounts' on ['jumpbox'] {
+task 'host1-mounts' on ['host1'] {
   efs_mount { 'logs':
     filesystem_id => 'fs-logs'
     mount_point   => '/logs'

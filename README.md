@@ -17,7 +17,8 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 ```
 pyproject.toml                 # Packaging metadata and CLI entrypoint
 src/geppetto_automation/       # Python package with runners, executors, operations, and DSL parser
-examples/plan.fops        # Sample Puppet-like DSL plan
+examples/plan.fops             # Sample Puppet-like DSL plan (delegates to config/hosts/host1/plan.fops)
+examples/config/               # Layered defaults/groups/hosts example hierarchy
 ```
 
 ### Plans
@@ -63,7 +64,7 @@ task 'bootstrap' on ['local'] {
   file { '/tmp/motd':
     ensure  => present
     mode    => '0644'
-    template => 'examples/templates/motd.tmpl'
+    template => 'examples/config/templates/motd.tmpl'
   }
 
   exec { 'seed-db':
@@ -105,6 +106,8 @@ file { '/etc/app/config':
 With JSON secrets, set `key` to the field name; string secrets are used as-is. Requires `boto3` on the runner host.
 
 Relative template paths resolve against the directory containing the plan file, so `/etc/geppetto/plan.fops` can naturally reference `/etc/geppetto/templates/...`. Service resources map onto `systemctl`, user resources wrap `useradd/usermod/userdel`, `authorized_key` resources keep SSH keys idempotent (with automatic base64 decoding), filesystem operations manage `/etc/fstab` entries plus `mount`/`umount` steps for both EFS and block devices, `remote_file` fetches artifacts from local paths/S3/HTTP, `rpm` downloads + installs RPMs when they aren’t already present, `timezone` sets `/etc/localtime`, `sysctl` manages kernel tunables, and `cron` manages `/etc/cron.d` jobs. DSL plans can also include additional files via `include 'relative/path.fops'` directives; include paths resolve relative to the parent plan. Resources can coordinate ordering by setting `depends_on => ['user.geppetto']`, ensuring dependent actions run after their prerequisites (and before them during cleanup).
+
+The `examples/config/` tree shows a layered defaults -> groups -> hosts layout; the top-level `examples/plan.fops` simply includes `config/hosts/host1/plan.fops` to keep CLI examples stable.
 
 An EFS mount example:
 

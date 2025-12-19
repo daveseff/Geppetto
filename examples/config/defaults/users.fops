@@ -1,4 +1,4 @@
-task 'jumpbox-users' on ['jumpbox'] {
+task 'host1-users' on ['host1'] {
   user { 'geppetto':
     shell    => '/bin/bash'
     locked   => true

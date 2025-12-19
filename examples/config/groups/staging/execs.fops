@@ -1,0 +1,16 @@
+task 'staging-hardening' on ['host1'] {
+  exec { 'set-crypto-policy':
+    command => '/usr/bin/update-crypto-policies --set DEFAULT:AD-SUPPORT'
+    unless  => "/usr/bin/update-crypto-policies --show | /usr/bin/grep -Fq 'AD-SUPPORT'"
+    on_success => {
+      exec { 'apply-authselect':
+        command => 'authselect apply-changes'
+      }
+    }
+    on_failure => {
+      exec { 'rollback-crypto-policy':
+        command => '/usr/bin/update-crypto-policies --set DEFAULT'
+      }
+    }
+  }
+}

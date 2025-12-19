@@ -1,5 +1,5 @@
-task 'jumpbox-mounts' on ['jumpbox'] {
-    authorized_key { 'geppetto-admin':
+task 'host1-keys' on ['host1'] {
+  authorized_key { 'geppetto-admin':
     user => 'geppetto'
     key  => 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCexample geppetto'
   }
