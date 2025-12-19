@@ -30,19 +30,21 @@ def test_state_store_removes_deleted_files(tmp_path: Path):
     state_store = StateStore(state_path)
 
     runner = TaskRunner(plan, state_store=state_store)
-    runner.run()
+    first_results = runner.run()
 
     assert target.exists()
     assert state_path.exists()
     assert (state_path.stat().st_mode & 0o777) == 0o600
+    assert any(res.changed and not res.failed for res in first_results)
 
     # Rewrite plan with no tasks to trigger cleanup
     plan_path.write_text("node 'local' { connection => local }\n")
     plan = loader.load(plan_path)
     state_store = StateStore(state_path)
     runner = TaskRunner(plan, state_store=state_store)
-    runner.run()
+    second_results = runner.run()
 
     assert not target.exists()
     data = state_path.read_text()
     assert '"local"' not in data or data.strip() == '{}'
+    assert any(res.changed and "removed" in res.details for res in second_results)

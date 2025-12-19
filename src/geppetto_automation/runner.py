@@ -24,7 +24,7 @@ class TaskRunner:
         for task in self.plan.tasks:
             results.extend(self._run_task(task))
         if self.state_store and not self.dry_run:
-            self.state_store.finalize(self.plan, self._executor_for)
+            results.extend(self.state_store.finalize(self.plan, self._executor_for))
         return results
 
     def _run_task(self, task: TaskSpec) -> list[ActionResult]:

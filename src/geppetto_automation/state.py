@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional
 import os
 
 from .operations import OPERATION_REGISTRY
+from .types import ActionResult, HostConfig
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,8 @@ class StateStore:
         }
         self.current.setdefault(host, {})[key] = entry
 
-    def finalize(self, plan, executor_factory) -> None:
+    def finalize(self, plan, executor_factory) -> list[ActionResult]:
+        results: list[ActionResult] = []
         for host_name, entries in list(self.previous.items()):
             host = plan.hosts.get(host_name)
             if not host:
@@ -75,25 +77,35 @@ class StateStore:
                 if key in self.current.get(host_name, {}):
                     continue
                 entry = entries[key]
-                self._destroy_entry(host, entry, executor_factory)
+                result = self._destroy_entry(host, entry, executor_factory)
+                if result is not None:
+                    results.append(result)
         self._write()
+        return results
 
-    def _destroy_entry(self, host, entry: dict[str, Any], executor_factory) -> None:
+    def _destroy_entry(self, host: HostConfig, entry: dict[str, Any], executor_factory) -> Optional[ActionResult]:
         action_type = entry.get("action")
         builder = DESTROY_BUILDERS.get(action_type)
         if not builder:
-            return
+            return None
         spec = builder(dict(entry.get("spec", {})))
         operation_cls = OPERATION_REGISTRY.get(action_type)
         if not operation_cls:
             logger.warning("No operation registered for '%s' when cleaning up", action_type)
-            return
+            return None
         executor = executor_factory(host)
         operation = operation_cls(spec)
         try:
-            operation.apply(host, executor)
+            return operation.apply(host, executor)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to clean up %s on host %s: %s", action_type, host.name, exc)
+            return ActionResult(
+                host=host.name,
+                action=action_type or "unknown",
+                changed=False,
+                details=str(exc),
+                failed=True,
+            )
 
     def _write(self) -> None:
         data = self.current
