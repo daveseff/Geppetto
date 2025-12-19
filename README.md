@@ -203,25 +203,32 @@ The suite covers the inventory loader, file and package operations, and runner p
 
 For environments where you want a simple `/usr/bin/geppetto-auto`, ship the `scripts/geppetto-auto` helper along with the installed package. The script is a tiny Python entry point that calls `geppetto_automation.cli.main`, so placing it in your `$PATH` (or symlinking it) immediately exposes the same flags as the packaged console entry point.
 
-### RPM packaging helper
+### RPM packaging
 
-Need to ship your automation bits as an RPM (RHEL 8 / Amazon Linux 2023)? First build a payload that mirrors `/usr/bin` + `/usr/lib` by running:
+Current workflow (no helper scripts):
 
-```bash
-scripts/build_payload.sh --payload build/payload
-```
+1. Build a source tarball:
 
-The helper builds the wheel (plus dependencies) and installs it into `build/payload/usr/...`, so the CLI and library files are staged exactly where the RPM expects them.
+   ```bash
+   python3 -m pip install --upgrade build  # once per machine
+   python3 -m build --sdist
+   ```
 
-Then wrap the payload:
+   This produces `dist/geppetto-automation-<version>.tar.gz`.
 
-```bash
-scripts/build_rpm.sh --name geppetto-auto --version 0.1.0 --payload build/payload \
-  --summary "Geppetto CLI" --description "Lightweight automation helper" \
-  --dist-tag .amzn2023
-```
+2. On your RPM build host, place the tarball where `rpmbuild` expects it and rename to match `Source0` in `geppetto-automation.spec` (underscores):
 
-The script wraps `rpmbuild`, autogenerates a spec file, and drops the finished RPM in `./dist/`. Additional flags let you set release numbers, scriptlets, vendor/URL metadata, distro suffixes (e.g. `--dist-tag .amzn2023`), and custom work/output directories.
+   ```bash
+   cp dist/geppetto-automation-<version>.tar.gz ~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz
+   ```
+
+3. Build the RPM:
+
+   ```bash
+   rpmbuild -bb geppetto-automation.spec
+   ```
+
+The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto-automation.spec` before building.
 
 ## Extending toward agents or server mode
 

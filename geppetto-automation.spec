@@ -30,8 +30,31 @@ Lightweight systems automation toolkit for Geppetto.
 %pyproject_install
 %pyproject_save_files geppetto_automation
 
+# Sample config tree under /etc/geppetto
+install -d %{buildroot}%{_sysconfdir}/geppetto/config/{defaults,groups/staging,hosts/host1,templates}
+install -m 0644 examples/plan.fops %{buildroot}%{_sysconfdir}/geppetto/plan.fops.sample
+install -m 0644 examples/config/main.conf.sample %{buildroot}%{_sysconfdir}/geppetto/main.conf.sample
+install -m 0644 examples/config/defaults/*.fops %{buildroot}%{_sysconfdir}/geppetto/config/defaults/
+install -m 0644 examples/config/groups/staging/*.fops %{buildroot}%{_sysconfdir}/geppetto/config/groups/staging/
+install -m 0644 examples/config/hosts/host1/*.fops %{buildroot}%{_sysconfdir}/geppetto/config/hosts/host1/
+install -m 0644 examples/config/templates/motd.tmpl %{buildroot}%{_sysconfdir}/geppetto/config/templates/motd.tmpl
+
 %files -f %{pyproject_files}
 %{_bindir}/geppetto-auto
+%dir %{_sysconfdir}/geppetto
+%dir %{_sysconfdir}/geppetto/config
+%dir %{_sysconfdir}/geppetto/config/defaults
+%dir %{_sysconfdir}/geppetto/config/groups
+%dir %{_sysconfdir}/geppetto/config/groups/staging
+%dir %{_sysconfdir}/geppetto/config/hosts
+%dir %{_sysconfdir}/geppetto/config/hosts/host1
+%dir %{_sysconfdir}/geppetto/config/templates
+%config(noreplace) %{_sysconfdir}/geppetto/plan.fops.sample
+%config(noreplace) %{_sysconfdir}/geppetto/main.conf.sample
+%config(noreplace) %{_sysconfdir}/geppetto/config/defaults/*.fops
+%config(noreplace) %{_sysconfdir}/geppetto/config/groups/staging/*.fops
+%config(noreplace) %{_sysconfdir}/geppetto/config/hosts/host1/*.fops
+%config(noreplace) %{_sysconfdir}/geppetto/config/templates/motd.tmpl
 %doc README.md
 %license LICENSE
 
