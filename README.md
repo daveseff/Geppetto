@@ -214,21 +214,21 @@ Current workflow (no helper scripts):
    python3 -m build --sdist
    ```
 
-   This produces `dist/geppetto-automation-<version>.tar.gz`.
+   This produces `dist/geppetto_automation-<version>.tar.gz`.
 
-2. On your RPM build host, place the tarball where `rpmbuild` expects it and rename to match `Source0` in `geppetto-automation.spec` (underscores):
+2. On your RPM build host, place the tarball where `rpmbuild` expects it and rename to match `Source0` in `geppetto_automation.spec` (underscores):
 
    ```bash
-   cp dist/geppetto-automation-<version>.tar.gz ~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz
+   cp dist/geppetto_automation-<version>.tar.gz ~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz
    ```
 
 3. Build the RPM:
 
    ```bash
-   rpmbuild -bb geppetto-automation.spec
+   rpmbuild -bb geppetto_automation.spec
    ```
 
-The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto-automation.spec` before building.
+The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto_automation.spec` before building.
 
 ### Debian/Ubuntu packaging (quick path)
 
@@ -238,25 +238,26 @@ A simple fpm-based build (no distro-native packaging files yet):
 python3 -m pip install --upgrade build fpm  # once per machine
 python3 -m build --sdist
 fpm -s python -t deb --no-python-dependencies \
-  --name geppetto-automation \
-  dist/geppetto-automation-*.tar.gz
+  --name geppetto_automation \
+  dist/geppetto_automation-*.tar.gz
 ```
 
-The command emits a `.deb` in the current directory. Install with `sudo dpkg -i geppetto-automation_*.deb`.
+The command emits a `.deb` in the current directory. Install with `sudo dpkg -i geppetto_automation_*.deb`.
 
-### Arch Linux packaging (quick path)
+### Arch Linux packaging (native makepkg)
 
-Similarly, fpm can spit out a `.pkg.tar.zst`:
+A simple `makepkg` flow using the sample PKGBUILD under `examples/packaging/`:
 
 ```bash
-python3 -m pip install --upgrade build fpm  # once per machine
-python3 -m build --sdist
-fpm -s python -t pacman --no-python-dependencies \
-  --name geppetto-automation \
-  dist/geppetto-automation-*.tar.gz
+sudo pacman -S --needed base-devel python-build python-installer python-wheel python-hatchling
+python3 -m build --sdist                     # creates dist/geppetto-automation-<ver>.tar.gz
+cp dist/geppetto_automation-*.tar.gz examples/packaging/
+cd examples/packaging
+makepkg -sf                                  # builds a .pkg.tar.zst (run as a normal user)
+sudo pacman -U ./*.pkg.tar.zst               # install system-wide
 ```
 
-Install with `sudo pacman -U geppetto-automation-*.pkg.tar.zst`. For a full PKGBUILD, mirror the same sdist and install targets.
+Adjust `pkgver` in `examples/packaging/PKGBUILD` to match the sdist. The PKGBUILD uses system Python tooling (hatchling backend) and installs via `python -m installer`, and it seeds `/etc/geppetto` with sample config/plan/templates.
 
 ## Extending toward agents or server mode
 

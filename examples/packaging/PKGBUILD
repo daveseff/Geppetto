@@ -1,0 +1,39 @@
+# Maintainer: Geppetto Maintainers <noreply@example.invalid>
+
+pkgname=geppetto_automation
+pkgver=0.0.6
+pkgrel=1
+pkgdesc="Lightweight automation toolkit for declarative host config"
+arch=('any')
+url="https://github.com/daveseff/Geppetto"
+license=('MIT')
+depends=('python' 'python-jinja' 'python-boto3' 'python-tomli')
+makedepends=('python-build' 'python-installer' 'python-wheel' 'python-hatchling')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+_py="/usr/bin/python"
+_env="env -u VIRTUAL_ENV -u PYTHONHOME -u PIP_REQUIRE_VIRTUALENV PYTHONNOUSERSITE=1"
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  ${_env} ${_py} -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  ${_env} ${_py} -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+
+  # Sample config tree under /etc/geppetto
+  install -d "$pkgdir/etc/geppetto/config/defaults" \
+             "$pkgdir/etc/geppetto/config/groups/staging" \
+             "$pkgdir/etc/geppetto/config/hosts/host1" \
+             "$pkgdir/etc/geppetto/config/templates"
+  install -m644 examples/plan.fops "$pkgdir/etc/geppetto/plan.fops.sample"
+  install -m644 examples/config/main.conf.sample "$pkgdir/etc/geppetto/main.conf.sample"
+  install -m644 examples/config/defaults/"*.fops" "$pkgdir/etc/geppetto/config/defaults/"
+  install -m644 examples/config/groups/staging/"*.fops" "$pkgdir/etc/geppetto/config/groups/staging/"
+  install -m644 examples/config/hosts/host1/"*.fops" "$pkgdir/etc/geppetto/config/hosts/host1/"
+  install -m644 examples/config/templates/motd.tmpl "$pkgdir/etc/geppetto/config/templates/motd.tmpl"
+}
