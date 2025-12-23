@@ -83,7 +83,7 @@ include 'shared/common.fops'
 
 `exec` runs commands through `/bin/sh -c` when given a string, supports `creates` skip files, `only_if`/`unless` guards, `cwd`, per-command `env` (list of `KEY=value` or a map), allowed `returns` codes, and `timeout` in seconds.
 
-Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, `limits`, `profile_env`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks), support `owner`/`group`, and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
+Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, `limits`, `profile_env`, `yum_repo`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks), support `owner`/`group`, and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
 
 ```
 allowed_hosts:
@@ -281,8 +281,8 @@ state_file = "/var/lib/geppetto/state.json"
 template_dir = "/etc/geppetto/templates"
 aws_region = "ap-southeast-2"
 aws_profile = "default"
-# If your configs live in a separate Git repo, Geppetto will clone/pull it here
-# before each run (including dry-runs).
+# If your configs live in a separate Git repo, Geppetto will clone/fetch+reset it here
+# before each run (including dry-runs), discarding local edits to match origin.
 # config_repo_path = "/etc/geppetto/config"
 # config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
 ```

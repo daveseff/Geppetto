@@ -12,6 +12,7 @@ from .user import UserOperation
 from .exec import ExecOperation
 from .limits import LimitsOperation
 from .profile_env import ProfileEnvOperation
+from .yum_repo import YumRepoOperation
 
 OPERATION_REGISTRY = {
     "package": PackageOperation,
@@ -30,6 +31,7 @@ OPERATION_REGISTRY = {
     "exec": ExecOperation,
     "limits": LimitsOperation,
     "profile_env": ProfileEnvOperation,
+    "yum_repo": YumRepoOperation,
 }
 
 __all__ = [
@@ -50,5 +52,6 @@ __all__ = [
     "ExecOperation",
     "LimitsOperation",
     "ProfileEnvOperation",
+    "YumRepoOperation",
     "OPERATION_REGISTRY",
 ]

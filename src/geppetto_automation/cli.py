@@ -194,6 +194,7 @@ def _sync_config_repo(cfg) -> None:
     if not repo_path.exists():
         if not repo_url:
             raise RuntimeError(f"{repo_path} does not exist and config_repo_url is not set")
+        logging.info("Cloning config repo %s into %s", repo_url, repo_path)
         result = subprocess.run(
             ["git", "clone", str(repo_url), str(repo_path)],
             capture_output=True,
@@ -206,13 +207,38 @@ def _sync_config_repo(cfg) -> None:
     if not (repo_path / ".git").exists():
         raise RuntimeError(f"{repo_path} is not a git repository (.git missing)")
 
-    result = subprocess.run(
-        ["git", "-C", str(repo_path), "pull", "--ff-only"],
+    logging.info("Fetching latest configs in %s", repo_path)
+    fetch = subprocess.run(
+        ["git", "-C", str(repo_path), "fetch", "--prune"],
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"git pull failed: {result.stderr.strip() or result.stdout.strip()}")
+    if fetch.returncode != 0:
+        raise RuntimeError(f"git fetch failed: {fetch.stderr.strip() or fetch.stdout.strip()}")
+
+    branch = _current_branch(repo_path)
+    target = f"origin/{branch}"
+    logging.info("Resetting config repo to %s", target)
+    reset = subprocess.run(
+        ["git", "-C", str(repo_path), "reset", "--hard", target],
+        capture_output=True,
+        text=True,
+    )
+    if reset.returncode != 0:
+        raise RuntimeError(f"git reset failed: {reset.stderr.strip() or reset.stdout.strip()}")
+
+
+def _current_branch(repo_path: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        branch = result.stdout.strip()
+        if branch:
+            return branch
+    return "master"
 
 
 def _apply_aws_env(cfg) -> None:
