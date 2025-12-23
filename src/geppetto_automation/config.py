@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
@@ -22,6 +22,8 @@ class GeppettoConfig:
     aws_profile: Optional[str] = None
     config_repo_path: Optional[Path] = None
     config_repo_url: Optional[str] = None
+    plugin_modules: list[str] = field(default_factory=list)
+    plugin_dirs: list[Path] = field(default_factory=list)
 
 
 def load_config(path: Path) -> GeppettoConfig:
@@ -36,6 +38,14 @@ def load_config(path: Path) -> GeppettoConfig:
     aws_profile = defaults.get("aws_profile")
     config_repo_path = defaults.get("config_repo_path")
     config_repo_url = defaults.get("config_repo_url")
+    plugin_modules = defaults.get("plugin_modules") or []
+    plugin_dirs = defaults.get("plugin_dirs") or []
+
+    if not isinstance(plugin_modules, list):
+        raise ValueError("plugin_modules must be a list")
+    if not isinstance(plugin_dirs, list):
+        raise ValueError("plugin_dirs must be a list")
+
     return GeppettoConfig(
         plan=Path(plan),
         state_file=Path(state_file) if state_file else None,
@@ -44,4 +54,6 @@ def load_config(path: Path) -> GeppettoConfig:
         aws_profile=str(aws_profile) if aws_profile else None,
         config_repo_path=Path(config_repo_path) if config_repo_path else None,
         config_repo_url=str(config_repo_url) if config_repo_url else None,
+        plugin_modules=[str(m) for m in plugin_modules],
+        plugin_dirs=[Path(p) for p in plugin_dirs],
     )

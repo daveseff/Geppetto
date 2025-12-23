@@ -17,3 +17,9 @@ template_dir = "/etc/geppetto/config/templates"
 # path before running (including dry-run), discarding local edits to match origin.
 # config_repo_path = "/etc/geppetto/config"
 # config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
+
+# Optional: plugin modules/dirs to extend operations. Each module/file may define
+# register_operations(registry) to add custom actions.
+# plugin_modules = ["yourpackage.geppetto_plugins"]
+# plugin_dirs = ["/etc/geppetto/plugins"]
+# (See examples/plugins/custom_ops.py for a starter plugin.)

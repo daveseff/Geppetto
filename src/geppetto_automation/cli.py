@@ -7,6 +7,8 @@ import sys
 import subprocess
 from pathlib import Path
 from typing import Optional, Sequence
+import importlib
+import importlib.util
 
 from .config import load_config
 from .dsl import DSLParseError
@@ -14,6 +16,7 @@ from .inventory import InventoryLoader
 from .runner import TaskRunner
 from .state import StateStore
 from .types import ActionResult
+from .operations import OPERATION_REGISTRY
 
 
 class Ansi:
@@ -77,6 +80,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     cfg = load_config(args.config)
     _apply_aws_env(cfg)
+    try:
+        _load_plugins(cfg)
+    except RuntimeError as exc:
+        print(colorize(f"Plugin load failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
     try:
         _sync_config_repo(cfg)
     except RuntimeError as exc:
@@ -227,6 +235,42 @@ def _sync_config_repo(cfg) -> None:
     if reset.returncode != 0:
         raise RuntimeError(f"git reset failed: {reset.stderr.strip() or reset.stdout.strip()}")
 
+
+def _load_plugins(cfg) -> None:
+    # Load modules declared in config
+    for module_name in getattr(cfg, "plugin_modules", []) or []:
+        logging.info("Loading plugin module %s", module_name)
+        try:
+            mod = importlib.import_module(module_name)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"failed to import plugin module {module_name}: {exc}") from exc
+        _register_from_module(mod, module_name)
+
+    # Load loose .py files from plugin_dirs
+    for plugin_dir in getattr(cfg, "plugin_dirs", []) or []:
+        path = Path(plugin_dir)
+        if not path.exists():
+            logging.warning("Plugin dir %s does not exist; skipping", path)
+            continue
+        for plugin_file in sorted(path.glob("*.py")):
+            module_name = f"geppetto_plugin_{plugin_file.stem}"
+            logging.info("Loading plugin file %s", plugin_file)
+            spec = importlib.util.spec_from_file_location(module_name, plugin_file)
+            if spec is None or spec.loader is None:
+                raise RuntimeError(f"could not load plugin file {plugin_file}")
+            mod = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(mod)  # type: ignore[arg-type]
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"failed to execute plugin file {plugin_file}: {exc}") from exc
+            _register_from_module(mod, plugin_file)
+
+
+def _register_from_module(mod, source) -> None:
+    if hasattr(mod, "register_operations"):
+        mod.register_operations(OPERATION_REGISTRY)
+    else:
+        logging.info("Plugin %s has no register_operations; nothing to do", source)
 
 def _current_branch(repo_path: Path) -> str:
     result = subprocess.run(

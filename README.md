@@ -285,6 +285,11 @@ aws_profile = "default"
 # before each run (including dry-runs), discarding local edits to match origin.
 # config_repo_path = "/etc/geppetto/config"
 # config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
+# Optional plugins: modules or .py files that expose register_operations(registry)
+# to add custom resources.
+# plugin_modules = ["yourpackage.geppetto_plugins"]
+# plugin_dirs = ["/etc/geppetto/plugins"]
+# (See examples/plugins/custom_ops.py for a starter plugin.)
 ```
 
 Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.
