@@ -12,3 +12,8 @@ state_file = "/var/lib/geppetto/state.json"
 # Base directory for relative templates (optional). When set, template references
 # like template => "templates/motd.tmpl" resolve under this directory.
 template_dir = "/etc/geppetto/config/templates"
+
+# Optional: Git-backed config repo. If set, geppetto-auto will git pull (or clone) this
+# path before running, even in dry-run mode, so plans stay current.
+# config_repo_path = "/etc/geppetto/config"
+# config_repo_url  = "git@github.com:yourorg/geppetto-config.git"

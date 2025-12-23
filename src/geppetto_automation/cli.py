@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+import subprocess
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -76,6 +77,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     cfg = load_config(args.config)
     _apply_aws_env(cfg)
+    try:
+        _sync_config_repo(cfg)
+    except RuntimeError as exc:
+        print(colorize(f"Config sync failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
     plan_path = args.plan or cfg.plan
     loader = InventoryLoader()
     try:
@@ -176,6 +182,37 @@ def _clear_progress() -> None:
     if _last_progress_len:
         print(" " * _last_progress_len, end="\r", flush=True)
         _last_progress_len = 0
+
+
+def _sync_config_repo(cfg) -> None:
+    repo_path = getattr(cfg, "config_repo_path", None)
+    if not repo_path:
+        return
+    repo_path = Path(repo_path)
+    repo_url = getattr(cfg, "config_repo_url", None)
+
+    if not repo_path.exists():
+        if not repo_url:
+            raise RuntimeError(f"{repo_path} does not exist and config_repo_url is not set")
+        result = subprocess.run(
+            ["git", "clone", str(repo_url), str(repo_path)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"git clone failed: {result.stderr.strip() or result.stdout.strip()}")
+        return
+
+    if not (repo_path / ".git").exists():
+        raise RuntimeError(f"{repo_path} is not a git repository (.git missing)")
+
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "pull", "--ff-only"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git pull failed: {result.stderr.strip() or result.stdout.strip()}")
 
 
 def _apply_aws_env(cfg) -> None:

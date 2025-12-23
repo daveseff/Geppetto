@@ -281,6 +281,10 @@ state_file = "/var/lib/geppetto/state.json"
 template_dir = "/etc/geppetto/templates"
 aws_region = "ap-southeast-2"
 aws_profile = "default"
+# If your configs live in a separate Git repo, Geppetto will clone/pull it here
+# before each run (including dry-runs).
+# config_repo_path = "/etc/geppetto/config"
+# config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
 ```
 
 Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.
