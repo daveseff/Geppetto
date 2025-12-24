@@ -11,6 +11,7 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 - New `exec` resource to mirror Puppet's `exec` (guards, `creates`, env, cwd, allowed return codes).
 - Built-in dry-run flag so you can validate idempotent behavior before touching a node.
 - File templates support both `$var` substitution and Jinja (`{{ }}` / `{% %}`) for loops and conditionals, including values pulled from AWS Secrets Manager.
+- Optional plugins so you can ship new operations without forking core.
 
 ## Project layout
 
@@ -294,3 +295,7 @@ aws_profile = "default"
 ```
 
 Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.
+
+## Plugins
+
+Geppetto can load external Python modules to add new operations at runtime. List importable modules via `plugin_modules` or point `plugin_dirs` at folders of standalone `.py` files; each module/file should export `register_operations(registry)` to add new operation classes. See `docs/custom-plugins.md` for authoring guidance and examples. A growing catalog of ready-to-use plugins lives at https://github.com/daveseff/Geppetto_Plugins.

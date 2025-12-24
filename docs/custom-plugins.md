@@ -50,6 +50,7 @@ Any exception during import stops the run; check stderr for the failure. Logging
 - Ship your plugin as a normal Python package and ensure it is installed alongside `geppetto-automation`, or drop standalone `.py` files into a plugin directory.
 - If your operation needs extra dependencies, declare them in your package. For standalone files, install the deps system-wide or vendor them.
 - Avoid side effects on import; keep all work inside `register_operations` or `apply`.
+- Looking for ready-made plugins? Browse https://github.com/daveseff/Geppetto_Plugins.
 
 ## Writing robust operations
 
