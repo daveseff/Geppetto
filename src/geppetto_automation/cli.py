@@ -4,8 +4,11 @@ import argparse
 import logging
 import os
 import sys
+import subprocess
 from pathlib import Path
 from typing import Optional, Sequence
+import importlib
+import importlib.util
 
 from .config import load_config
 from .dsl import DSLParseError
@@ -13,6 +16,7 @@ from .inventory import InventoryLoader
 from .runner import TaskRunner
 from .state import StateStore
 from .types import ActionResult
+from .operations import OPERATION_REGISTRY
 
 
 class Ansi:
@@ -76,6 +80,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     cfg = load_config(args.config)
     _apply_aws_env(cfg)
+    try:
+        _load_plugins(cfg)
+    except RuntimeError as exc:
+        print(colorize(f"Plugin load failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
+    try:
+        _sync_config_repo(cfg)
+    except RuntimeError as exc:
+        print(colorize(f"Config sync failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
     plan_path = args.plan or cfg.plan
     loader = InventoryLoader()
     try:
@@ -176,6 +190,99 @@ def _clear_progress() -> None:
     if _last_progress_len:
         print(" " * _last_progress_len, end="\r", flush=True)
         _last_progress_len = 0
+
+
+def _sync_config_repo(cfg) -> None:
+    repo_path = getattr(cfg, "config_repo_path", None)
+    if not repo_path:
+        return
+    repo_path = Path(repo_path)
+    repo_url = getattr(cfg, "config_repo_url", None)
+
+    if not repo_path.exists():
+        if not repo_url:
+            raise RuntimeError(f"{repo_path} does not exist and config_repo_url is not set")
+        logging.info("Cloning config repo %s into %s", repo_url, repo_path)
+        result = subprocess.run(
+            ["git", "clone", str(repo_url), str(repo_path)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"git clone failed: {result.stderr.strip() or result.stdout.strip()}")
+        return
+
+    if not (repo_path / ".git").exists():
+        raise RuntimeError(f"{repo_path} is not a git repository (.git missing)")
+
+    logging.info("Fetching latest configs in %s", repo_path)
+    fetch = subprocess.run(
+        ["git", "-C", str(repo_path), "fetch", "--prune"],
+        capture_output=True,
+        text=True,
+    )
+    if fetch.returncode != 0:
+        raise RuntimeError(f"git fetch failed: {fetch.stderr.strip() or fetch.stdout.strip()}")
+
+    branch = _current_branch(repo_path)
+    target = f"origin/{branch}"
+    logging.info("Resetting config repo to %s", target)
+    reset = subprocess.run(
+        ["git", "-C", str(repo_path), "reset", "--hard", target],
+        capture_output=True,
+        text=True,
+    )
+    if reset.returncode != 0:
+        raise RuntimeError(f"git reset failed: {reset.stderr.strip() or reset.stdout.strip()}")
+
+
+def _load_plugins(cfg) -> None:
+    # Load modules declared in config
+    for module_name in getattr(cfg, "plugin_modules", []) or []:
+        logging.info("Loading plugin module %s", module_name)
+        try:
+            mod = importlib.import_module(module_name)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"failed to import plugin module {module_name}: {exc}") from exc
+        _register_from_module(mod, module_name)
+
+    # Load loose .py files from plugin_dirs
+    for plugin_dir in getattr(cfg, "plugin_dirs", []) or []:
+        path = Path(plugin_dir)
+        if not path.exists():
+            logging.warning("Plugin dir %s does not exist; skipping", path)
+            continue
+        for plugin_file in sorted(path.glob("*.py")):
+            module_name = f"geppetto_plugin_{plugin_file.stem}"
+            logging.info("Loading plugin file %s", plugin_file)
+            spec = importlib.util.spec_from_file_location(module_name, plugin_file)
+            if spec is None or spec.loader is None:
+                raise RuntimeError(f"could not load plugin file {plugin_file}")
+            mod = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(mod)  # type: ignore[arg-type]
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(f"failed to execute plugin file {plugin_file}: {exc}") from exc
+            _register_from_module(mod, plugin_file)
+
+
+def _register_from_module(mod, source) -> None:
+    if hasattr(mod, "register_operations"):
+        mod.register_operations(OPERATION_REGISTRY)
+    else:
+        logging.info("Plugin %s has no register_operations; nothing to do", source)
+
+def _current_branch(repo_path: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        branch = result.stdout.strip()
+        if branch:
+            return branch
+    return "master"
 
 
 def _apply_aws_env(cfg) -> None:

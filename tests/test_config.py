@@ -19,6 +19,10 @@ def test_load_config_overrides(tmp_path: Path) -> None:
         template_dir = "/opt/geppetto/templates"
         aws_region = "ap-southeast-2"
         aws_profile = "myprofile"
+        config_repo_path = "/opt/geppetto/config"
+        config_repo_url = "https://example.invalid/geppetto-config.git"
+        plugin_modules = ["my.plugins.ops"]
+        plugin_dirs = ["/opt/geppetto/plugins"]
         """
     )
 
@@ -28,3 +32,7 @@ def test_load_config_overrides(tmp_path: Path) -> None:
     assert config.template_dir == Path("/opt/geppetto/templates")
     assert config.aws_region == "ap-southeast-2"
     assert config.aws_profile == "myprofile"
+    assert config.config_repo_path == Path("/opt/geppetto/config")
+    assert config.config_repo_url == "https://example.invalid/geppetto-config.git"
+    assert config.plugin_modules == ["my.plugins.ops"]
+    assert config.plugin_dirs == [Path("/opt/geppetto/plugins")]

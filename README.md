@@ -11,6 +11,7 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 - New `exec` resource to mirror Puppet's `exec` (guards, `creates`, env, cwd, allowed return codes).
 - Built-in dry-run flag so you can validate idempotent behavior before touching a node.
 - File templates support both `$var` substitution and Jinja (`{{ }}` / `{% %}`) for loops and conditionals, including values pulled from AWS Secrets Manager.
+- Optional plugins so you can ship new operations without forking core.
 
 ## Project layout
 
@@ -83,7 +84,7 @@ include 'shared/common.fops'
 
 `exec` runs commands through `/bin/sh -c` when given a string, supports `creates` skip files, `only_if`/`unless` guards, `cwd`, per-command `env` (list of `KEY=value` or a map), allowed `returns` codes, and `timeout` in seconds.
 
-Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, `limits`, `profile_env`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks), support `owner`/`group`, and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
+Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, `limits`, `profile_env`, `yum_repo`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks), support `owner`/`group`, and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
 
 ```
 allowed_hosts:
@@ -214,21 +215,21 @@ Current workflow (no helper scripts):
    python3 -m build --sdist
    ```
 
-   This produces `dist/geppetto-automation-<version>.tar.gz`.
+   This produces `dist/geppetto_automation-<version>.tar.gz`.
 
-2. On your RPM build host, place the tarball where `rpmbuild` expects it and rename to match `Source0` in `geppetto-automation.spec` (underscores):
+2. On your RPM build host, place the tarball where `rpmbuild` expects it and rename to match `Source0` in `geppetto_automation.spec` (underscores):
 
    ```bash
-   cp dist/geppetto-automation-<version>.tar.gz ~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz
+   cp dist/geppetto_automation-<version>.tar.gz ~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz
    ```
 
 3. Build the RPM:
 
    ```bash
-   rpmbuild -bb geppetto-automation.spec
+   rpmbuild -bb geppetto_automation.spec
    ```
 
-The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto-automation.spec` before building.
+The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto_automation.spec` before building.
 
 ### Debian/Ubuntu packaging (quick path)
 
@@ -238,25 +239,26 @@ A simple fpm-based build (no distro-native packaging files yet):
 python3 -m pip install --upgrade build fpm  # once per machine
 python3 -m build --sdist
 fpm -s python -t deb --no-python-dependencies \
-  --name geppetto-automation \
-  dist/geppetto-automation-*.tar.gz
+  --name geppetto_automation \
+  dist/geppetto_automation-*.tar.gz
 ```
 
-The command emits a `.deb` in the current directory. Install with `sudo dpkg -i geppetto-automation_*.deb`.
+The command emits a `.deb` in the current directory. Install with `sudo dpkg -i geppetto_automation_*.deb`.
 
-### Arch Linux packaging (quick path)
+### Arch Linux packaging (native makepkg)
 
-Similarly, fpm can spit out a `.pkg.tar.zst`:
+A simple `makepkg` flow using the sample PKGBUILD under `examples/packaging/`:
 
 ```bash
-python3 -m pip install --upgrade build fpm  # once per machine
-python3 -m build --sdist
-fpm -s python -t pacman --no-python-dependencies \
-  --name geppetto-automation \
-  dist/geppetto-automation-*.tar.gz
+sudo pacman -S --needed base-devel python-build python-installer python-wheel python-hatchling
+python3 -m build --sdist                     # creates dist/geppetto-automation-<ver>.tar.gz
+cp dist/geppetto_automation-*.tar.gz examples/packaging/
+cd examples/packaging
+makepkg -sf                                  # builds a .pkg.tar.zst (run as a normal user)
+sudo pacman -U ./*.pkg.tar.zst               # install system-wide
 ```
 
-Install with `sudo pacman -U geppetto-automation-*.pkg.tar.zst`. For a full PKGBUILD, mirror the same sdist and install targets.
+Adjust `pkgver` in `examples/packaging/PKGBUILD` to match the sdist. The PKGBUILD uses system Python tooling (hatchling backend) and installs via `python -m installer`, and it seeds `/etc/geppetto` with sample config/plan/templates.
 
 ## Extending toward agents or server mode
 
@@ -281,6 +283,19 @@ state_file = "/var/lib/geppetto/state.json"
 template_dir = "/etc/geppetto/templates"
 aws_region = "ap-southeast-2"
 aws_profile = "default"
+# If your configs live in a separate Git repo, Geppetto will clone/fetch+reset it here
+# before each run (including dry-runs), discarding local edits to match origin.
+# config_repo_path = "/etc/geppetto/config"
+# config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
+# Optional plugins: modules or .py files that expose register_operations(registry)
+# to add custom resources.
+# plugin_modules = ["yourpackage.geppetto_plugins"]
+# plugin_dirs = ["/etc/geppetto/plugins"]
+# (See examples/plugins/custom_ops.py for a starter plugin.)
 ```
 
 Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.
+
+## Plugins
+
+Geppetto can load external Python modules to add new operations at runtime. List importable modules via `plugin_modules` or point `plugin_dirs` at folders of standalone `.py` files; each module/file should export `register_operations(registry)` to add new operation classes. See `docs/custom-plugins.md` for authoring guidance and examples. A growing catalog of ready-to-use plugins lives at https://github.com/daveseff/Geppetto_Plugins.
