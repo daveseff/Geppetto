@@ -2,6 +2,16 @@
 
 A lightweight Python automation toolkit that covers both "server/agent" and "server-less" execution models. The current drop focuses on local (server-less) execution, laying the groundwork for daemonized agents by using executor abstractions throughout the code.
 
+## Table of contents
+
+- [Highlights](#highlights)
+- [Project layout](#project-layout)
+  - [Plans](#plans)
+- [Usage](#usage)
+- [Extending toward agents or server mode](#extending-toward-agents-or-server-mode)
+- [Next ideas](#next-ideas)
+- [Plugins](#plugins)
+
 ## Highlights
 
 - Minimal dependencies (standard library only) for quick bootstrapping.
