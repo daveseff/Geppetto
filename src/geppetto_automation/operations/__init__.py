@@ -1,5 +1,6 @@
 from .authorized_key import AuthorizedKeyOperation
 from .base import Operation
+from .ca_cert import CaCertOperation
 from .cron import CronOperation
 from .file import FileOperation
 from .mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
@@ -20,6 +21,7 @@ OPERATION_REGISTRY = {
     "service": ServiceOperation,
     "user": UserOperation,
     "authorized_key": AuthorizedKeyOperation,
+    "ca_cert": CaCertOperation,
     "efs_mount": EfsMountOperation,
     "block_device": BlockDeviceMountOperation,
     "network_mount": NetworkMountOperation,
@@ -41,6 +43,7 @@ __all__ = [
     "ServiceOperation",
     "UserOperation",
     "AuthorizedKeyOperation",
+    "CaCertOperation",
     "EfsMountOperation",
     "BlockDeviceMountOperation",
     "NetworkMountOperation",

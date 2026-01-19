@@ -33,6 +33,7 @@ DESTROY_BUILDERS: dict[str, Callable[[dict[str, Any]], Optional[dict[str, Any]]]
     "remote_file": _destroy_file,
     "user": lambda spec: {**spec, "state": "absent"},
     "authorized_key": lambda spec: {**spec, "state": "absent"},
+    "ca_cert": lambda spec: {**spec, "state": "absent"},
     "service": lambda spec: {**spec, "enabled": False, "state": "stopped"},
     "efs_mount": lambda spec: {**spec, "state": "absent"},
     "network_mount": lambda spec: {**spec, "state": "absent"},

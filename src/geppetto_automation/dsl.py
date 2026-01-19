@@ -209,11 +209,11 @@ class DSLParser:
         self._consume("LBRACE")
         actions: list[ActionSpec] = []
         while not self._check("RBRACE"):
-            actions.append(self._parse_resource())
+            actions.extend(self._parse_resource())
         self._consume("RBRACE")
         return TaskSpec(name=name, hosts=hosts, actions=actions)
 
-    def _parse_resource(self) -> ActionSpec:
+    def _parse_resource(self) -> list[ActionSpec]:
         type_token = self._consume("IDENT")
         resource_type = type_token.value
         self._consume("LBRACE")
@@ -221,15 +221,24 @@ class DSLParser:
         self._consume("COLON")
         attrs = self._parse_attributes()
         self._consume("RBRACE")
-        data: dict[str, object] = {}
         if isinstance(title, list):
-            if resource_type != "package":
-                raise DSLParseError("Only package resources accept list titles")
-            data["packages"] = [str(item) for item in title]
-        else:
-            data["name"] = str(title)
+            if resource_type == "package":
+                data: dict[str, object] = {"packages": [str(item) for item in title]}
+                return [self._build_action(resource_type, data, attrs)]
             if resource_type == "file":
-                data.setdefault("path", data["name"])
+                actions: list[ActionSpec] = []
+                for item in title:
+                    data = {"name": str(item), "path": str(item)}
+                    actions.append(self._build_action(resource_type, data, attrs))
+                return actions
+            raise DSLParseError("Only package or file resources accept list titles")
+
+        data = {"name": str(title)}
+        if resource_type == "file":
+            data.setdefault("path", data["name"])
+        return [self._build_action(resource_type, data, attrs)]
+
+    def _build_action(self, resource_type: str, data: dict[str, object], attrs: dict[str, object]) -> ActionSpec:
         depends_on: list[str] = []
         on_success: list[ActionSpec] = []
         on_failure: list[ActionSpec] = []
@@ -328,7 +337,7 @@ class DSLParser:
         actions: list[ActionSpec] = []
         self._consume("LBRACE")
         while not self._check("RBRACE"):
-            actions.append(self._parse_resource())
+            actions.extend(self._parse_resource())
         self._consume("RBRACE")
         return actions
 

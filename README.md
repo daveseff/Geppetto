@@ -84,7 +84,7 @@ include 'shared/common.fops'
 
 `exec` runs commands through `/bin/sh -c` when given a string, supports `creates` skip files, `only_if`/`unless` guards, `cwd`, per-command `env` (list of `KEY=value` or a map), allowed `returns` codes, and `timeout` in seconds.
 
-Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, `limits`, `profile_env`, `yum_repo`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks), support `owner`/`group`, and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
+Each resource block becomes an action (`package`, `file`, `service`, `user`, `authorized_key`, `ca_cert`, `remote_file`, `rpm`, `efs_mount`, `network_mount`, `block_device`, `timezone`, `sysctl`, `cron`, `limits`, `profile_env`, `yum_repo`, etc.). Attributes such as `ensure => present` map directly onto the corresponding operation's parameters (e.g., `state`). File resources understand optional `template` attributes or `link_target` (to manage symlinks), support `owner`/`group`, and can also ensure directories when `ensure => directory`. Actions may also carry `on_success` and `on_failure` blocks of nested actions: `on_success` runs only when the parent changes without failing; `on_failure` runs only when the parent fails. Referenced files render using host variables plus per-resource `variables`. Templates accept either `$var`/`${var}` placeholders or Jinja control flow like:
 
 ```
 allowed_hosts:
@@ -101,6 +101,19 @@ file { '/etc/app/config':
   variables => {
     db_password = { aws_secret = 'prod/db', key = 'password' }
   }
+}
+```
+
+File resources can also take a list of paths to apply the same attributes:
+
+```
+file { [
+  '/apps/bmg/data',
+  '/apps/bmg/data/done',
+  '/apps/bmg/data/error',
+]:
+  ensure => directory
+  mode   => '0755'
 }
 ```
 
@@ -152,6 +165,16 @@ exec { 'set-crypto-policy':
       command => '/usr/bin/update-crypto-policies --set DEFAULT'
     }
   }
+}
+```
+
+CA cert management (OS + Java):
+
+```
+ca_cert { 'corp-root':
+  path          => 'files/certs/corp-root.pem'
+  alias         => 'corp-root'
+  java_keystore => '/etc/pki/java/cacerts'
 }
 ```
 

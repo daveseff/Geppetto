@@ -39,6 +39,21 @@ def test_non_package_list_title_raises() -> None:
       }
     }
     """
+    plan = parser.parse_text(sample)
+    assert len(plan.tasks[0].actions) == 2
+    assert plan.tasks[0].actions[0].data["path"] == "a"
+    assert plan.tasks[0].actions[1].data["path"] == "b"
+
+
+def test_other_list_title_raises() -> None:
+    parser = DSLParser()
+    sample = """
+    task 'demo' on 'local' {
+      service { ['a', 'b']:
+        state => running
+      }
+    }
+    """
     with pytest.raises(DSLParseError):
         parser.parse_text(sample)
 

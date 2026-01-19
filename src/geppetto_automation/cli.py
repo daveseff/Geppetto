@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+import importlib.metadata
 import subprocess
 from pathlib import Path
 from typing import Optional, Sequence
@@ -64,6 +65,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default="INFO",
         help="Python logging level (default: INFO)",
     )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="store_true",
+        help="Show installed version and exit",
+    )
     return parser.parse_args(argv)
 
 
@@ -76,6 +83,9 @@ def configure_logging(level: str) -> None:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
+    if args.version:
+        print(_version_string())
+        return 0
     configure_logging(args.log_level)
 
     cfg = load_config(args.config)
@@ -293,6 +303,13 @@ def _apply_aws_env(cfg) -> None:
             os.environ["AWS_REGION"] = cfg.aws_region  # type: ignore[assignment]
         if "AWS_DEFAULT_REGION" not in os.environ:
             os.environ["AWS_DEFAULT_REGION"] = cfg.aws_region  # type: ignore[assignment]
+
+
+def _version_string() -> str:
+    try:
+        return importlib.metadata.version("geppetto-automation")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
 
 
 class Summary:
