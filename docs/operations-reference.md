@@ -11,6 +11,7 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - [efs_mount](#efs_mount)
 - [exec](#exec)
 - [file](#file)
+- [git_pull](#git_pull)
 - [limits](#limits)
 - [network_mount](#network_mount)
 - [package](#package)
@@ -88,6 +89,13 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - `link_target`/`target` (string): create/manage a symlink.
 - `owner` (user or uid): POSIX owner.
 - `group` (group or gid): POSIX group.
+
+## git_pull
+- `source` (string): git repository URL/path. Required.
+- `dest` (string): destination directory. Required.
+- `state` (present|absent, default present).
+- `owner` (string|int): set owner on files/dirs.
+- `group` (string|int): set group on files/dirs.
 
 ## limits
 - `name` (string): file name (without `.conf`). Required.

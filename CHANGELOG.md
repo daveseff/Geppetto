@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.0.8
+
+### Added
+- `git_pull` operation for deploying repositories to a destination path.
+- Support list titles for `file` resources in the DSL.
+- CLI version flag (`-V`/`--version`).
+
 ## 0.0.7
 
 ### Added

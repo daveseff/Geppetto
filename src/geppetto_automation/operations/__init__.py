@@ -3,6 +3,7 @@ from .base import Operation
 from .ca_cert import CaCertOperation
 from .cron import CronOperation
 from .file import FileOperation
+from .git_pull import GitPullOperation
 from .mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
 from .package import PackageOperation
 from .remote import RemoteFileOperation, RpmInstallOperation
@@ -18,6 +19,7 @@ from .yum_repo import YumRepoOperation
 OPERATION_REGISTRY = {
     "package": PackageOperation,
     "file": FileOperation,
+    "git_pull": GitPullOperation,
     "service": ServiceOperation,
     "user": UserOperation,
     "authorized_key": AuthorizedKeyOperation,
@@ -39,6 +41,7 @@ OPERATION_REGISTRY = {
 __all__ = [
     "Operation",
     "FileOperation",
+    "GitPullOperation",
     "PackageOperation",
     "ServiceOperation",
     "UserOperation",
