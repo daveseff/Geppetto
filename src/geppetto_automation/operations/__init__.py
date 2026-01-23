@@ -3,6 +3,7 @@ from .base import Operation
 from .ca_cert import CaCertOperation
 from .cron import CronOperation
 from .file import FileOperation
+from .group import GroupOperation
 from .git_pull import GitPullOperation
 from .mount import BlockDeviceMountOperation, EfsMountOperation, NetworkMountOperation
 from .package import PackageOperation
@@ -20,6 +21,7 @@ OPERATION_REGISTRY = {
     "package": PackageOperation,
     "file": FileOperation,
     "git_pull": GitPullOperation,
+    "group": GroupOperation,
     "service": ServiceOperation,
     "user": UserOperation,
     "authorized_key": AuthorizedKeyOperation,
@@ -42,6 +44,7 @@ __all__ = [
     "Operation",
     "FileOperation",
     "GitPullOperation",
+    "GroupOperation",
     "PackageOperation",
     "ServiceOperation",
     "UserOperation",

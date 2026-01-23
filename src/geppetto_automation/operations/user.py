@@ -17,6 +17,8 @@ class UserInfo:
     name: str
     shell: str
     home: str
+    uid: int
+    gid: int
 
 
 class UserManager:
@@ -25,7 +27,13 @@ class UserManager:
             entry = pwd.getpwnam(username)
         except KeyError:
             return None
-        return UserInfo(name=entry.pw_name, shell=entry.pw_shell, home=entry.pw_dir)
+        return UserInfo(
+            name=entry.pw_name,
+            shell=entry.pw_shell,
+            home=entry.pw_dir,
+            uid=entry.pw_uid,
+            gid=entry.pw_gid,
+        )
 
     def add(
         self,
@@ -36,8 +44,14 @@ class UserManager:
         system: bool,
         create_home: bool,
         comment: Optional[str],
+        uid: Optional[int],
+        gid: Optional[int],
     ) -> None:
         cmd = ["useradd"]
+        if uid is not None:
+            cmd += ["--uid", str(uid)]
+        if gid is not None:
+            cmd += ["--gid", str(gid)]
         if shell:
             cmd += ["--shell", shell]
         if create_home:
@@ -58,6 +72,15 @@ class UserManager:
 
     def set_shell(self, executor: Executor, name: str, shell: str) -> None:
         executor.run(["usermod", "--shell", shell, name])
+
+    def set_uid_gid(self, executor: Executor, name: str, *, uid: Optional[int], gid: Optional[int]) -> None:
+        cmd = ["usermod"]
+        if uid is not None:
+            cmd += ["--uid", str(uid)]
+        if gid is not None:
+            cmd += ["--gid", str(gid)]
+        cmd.append(name)
+        executor.run(cmd)
 
     def lock(self, executor: Executor, name: str) -> None:
         executor.run(["passwd", "-l", name])
@@ -93,6 +116,8 @@ class UserOperation(Operation):
         self.remove_home = bool(self._to_bool(spec.get("remove_home", False)))
         self.locked: Optional[bool] = self._to_bool(spec.get("locked"))
         self.comment = spec.get("comment")
+        self.uid = self._to_int(spec.get("uid"))
+        self.gid = self._to_int(spec.get("gid"))
         self.manager = UserManager()
 
     @staticmethod
@@ -117,6 +142,19 @@ class UserOperation(Operation):
         result = UserOperation._to_bool(value)
         return default if result is None else bool(result)
 
+    @staticmethod
+    def _to_int(value: Optional[Any]) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        text = str(value).strip()
+        if not text:
+            return None
+        if not text.isdigit():
+            raise ValueError(f"Unable to interpret integer value '{value}'")
+        return int(text)
+
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
         info = self.manager.get(self.name)
         changes: list[str] = []
@@ -131,6 +169,8 @@ class UserOperation(Operation):
                     system=self.system,
                     create_home=self.create_home,
                     comment=str(self.comment) if self.comment else None,
+                    uid=self.uid,
+                    gid=self.gid,
                 )
                 changes.append("created")
             else:
@@ -138,6 +178,16 @@ class UserOperation(Operation):
                     logger.debug("Updating shell for %s", self.name)
                     self.manager.set_shell(executor, self.name, str(self.shell))
                     changes.append("shell")
+                if self.uid is not None or self.gid is not None:
+                    uid_mismatch = self.uid is not None and info.uid != self.uid
+                    gid_mismatch = self.gid is not None and info.gid != self.gid
+                    if uid_mismatch or gid_mismatch:
+                        logger.debug("Updating uid/gid for %s", self.name)
+                        self.manager.set_uid_gid(executor, self.name, uid=self.uid, gid=self.gid)
+                        if uid_mismatch:
+                            changes.append("uid")
+                        if gid_mismatch:
+                            changes.append("gid")
 
             if self.locked is not None:
                 locked = self.manager.is_locked(executor, self.name)

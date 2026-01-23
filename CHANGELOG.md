@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.0.10
+
+### Added
+- `group` resources can specify `gid`.
+
+## 0.0.9
+
+### Added
+- `user` resources can specify `uid` and `gid`.
+
 ## 0.0.8
 
 ### Added

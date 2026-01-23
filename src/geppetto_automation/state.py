@@ -34,6 +34,7 @@ DESTROY_BUILDERS: dict[str, Callable[[dict[str, Any]], Optional[dict[str, Any]]]
     "user": lambda spec: {**spec, "state": "absent"},
     "authorized_key": lambda spec: {**spec, "state": "absent"},
     "git_pull": lambda spec: {**spec, "state": "absent"},
+    "group": lambda spec: {**spec, "state": "absent"},
     "ca_cert": lambda spec: {**spec, "state": "absent"},
     "service": lambda spec: {**spec, "enabled": False, "state": "stopped"},
     "efs_mount": lambda spec: {**spec, "state": "absent"},

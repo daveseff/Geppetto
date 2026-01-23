@@ -12,6 +12,7 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - [exec](#exec)
 - [file](#file)
 - [git_pull](#git_pull)
+- [group](#group)
 - [limits](#limits)
 - [network_mount](#network_mount)
 - [package](#package)
@@ -97,6 +98,11 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - `owner` (string|int): set owner on files/dirs.
 - `group` (string|int): set group on files/dirs.
 
+## group
+- `name` (string): group name. Required.
+- `state` (present|absent, default present).
+- `gid` (int|string): numeric gid.
+
 ## limits
 - `name` (string): file name (without `.conf`). Required.
 - `state` (present|absent, default present).
@@ -158,6 +164,8 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - `comment` (string): gecos/comment.
 - `system` (bool): create as system user.
 - `locked` (bool): lock password.
+- `uid` (int|string): numeric uid.
+- `gid` (int|string): numeric gid.
 - `state` (present|absent, default present).
 
 ## yum_repo
