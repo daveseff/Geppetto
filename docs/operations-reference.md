@@ -137,9 +137,9 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - `source` (string): URI or local path. Required.
 - `dest` (string): destination path. Required.
 - `mode` (int or string): file mode.
+- `compare` (bytes|etag, default bytes).
 - `variables` (map): template variables for templated sources.
 - `headers` (map): HTTP headers (for http/https sources).
-
 ## rpm
 - `name` (string): package name. Required.
 - `source` (string): URL/path to RPM. Required.

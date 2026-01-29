@@ -316,6 +316,7 @@ state_file = "/var/lib/geppetto/state.json"
 template_dir = "/etc/geppetto/templates"
 aws_region = "ap-southeast-2"
 aws_profile = "default"
+log_file = "/var/log/geppetto/geppetto.log"
 # If your configs live in a separate Git repo, Geppetto will clone/fetch+reset it here
 # before each run (including dry-runs), discarding local edits to match origin.
 # config_repo_path = "/etc/geppetto/config"

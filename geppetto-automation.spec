@@ -1,5 +1,5 @@
 Name:           geppetto_automation
-Version:        0.0.10
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Geppetto automation tools
 
@@ -59,5 +59,5 @@ install -m 0644 examples/config/templates/motd.tmpl %{buildroot}%{_sysconfdir}/g
 %license LICENSE
 
 %changelog
-* Wed Feb 12 2025 Geppetto Maintainers <noreply@example.invalid> - 0.1.0-1
+* Wed Feb 12 2025 Geppetto Maintainers <noreply@example.invalid> - 0.1.1-1
 - Initial package

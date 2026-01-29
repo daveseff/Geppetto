@@ -13,6 +13,9 @@ state_file = "/var/lib/geppetto/state.json"
 # like template => "templates/motd.tmpl" resolve under this directory.
 template_dir = "/etc/geppetto/config/templates"
 
+# Optional: log file location (defaults to /var/log/geppetto/geppetto.log).
+log_file = "/var/log/geppetto/geppetto.log"
+
 # Optional: Git-backed config repo. If set, geppetto-auto will clone/fetch+reset this
 # path before running (including dry-run), discarding local edits to match origin.
 # config_repo_path = "/etc/geppetto/config"

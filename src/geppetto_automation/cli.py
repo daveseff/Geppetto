@@ -74,11 +74,30 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def configure_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(levelname)s %(name)s - %(message)s",
-    )
+def configure_logging(level: str, *, log_file: Optional[Path]) -> None:
+    log_level = getattr(logging, level.upper(), logging.INFO)
+    handlers: list[logging.Handler] = []
+    stream = logging.StreamHandler()
+    stream.setLevel(log_level)
+    stream.setFormatter(logging.Formatter("%(levelname)s %(name)s - %(message)s"))
+    handlers.append(stream)
+
+    if log_file:
+        try:
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(log_file)
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(
+                logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
+            )
+            handlers.append(file_handler)
+        except Exception as exc:  # noqa: BLE001
+            print(
+                colorize(f"Logging disabled: unable to open log file {log_file} ({exc})", Ansi.YELLOW),
+                file=sys.stderr,
+            )
+
+    logging.basicConfig(level=log_level, handlers=handlers)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -86,9 +105,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.version:
         print(_version_string())
         return 0
-    configure_logging(args.log_level)
 
     cfg = load_config(args.config)
+    configure_logging(args.log_level, log_file=cfg.log_file)
     _apply_aws_env(cfg)
     try:
         _load_plugins(cfg)
@@ -135,6 +154,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for result in results:
         _clear_progress()
         summary.add(result)
+        logger = logging.getLogger("geppetto")
+        if result.failed:
+            logger.error(
+                "host=%s action=%s resource=%s failed details=%s",
+                result.host,
+                result.action,
+                result.resource,
+                result.details,
+            )
+        else:
+            logger.info(
+                "host=%s action=%s resource=%s changed=%s details=%s",
+                result.host,
+                result.action,
+                result.resource,
+                result.changed,
+                result.details,
+            )
         if not should_display_result(result, effective_level):
             continue
         print(format_result(result))

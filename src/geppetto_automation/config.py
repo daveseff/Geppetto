@@ -11,6 +11,7 @@ except ModuleNotFoundError:  # pragma: no cover
 
 
 DEFAULT_PLAN = Path("/etc/geppetto/plan.fops")
+DEFAULT_LOG_FILE = Path("/var/log/geppetto/geppetto.log")
 
 
 @dataclass
@@ -22,6 +23,7 @@ class GeppettoConfig:
     aws_profile: Optional[str] = None
     config_repo_path: Optional[Path] = None
     config_repo_url: Optional[str] = None
+    log_file: Optional[Path] = DEFAULT_LOG_FILE
     plugin_modules: list[str] = field(default_factory=list)
     plugin_dirs: list[Path] = field(default_factory=list)
 
@@ -38,6 +40,7 @@ def load_config(path: Path) -> GeppettoConfig:
     aws_profile = defaults.get("aws_profile")
     config_repo_path = defaults.get("config_repo_path")
     config_repo_url = defaults.get("config_repo_url")
+    log_file = defaults.get("log_file")
     plugin_modules = defaults.get("plugin_modules") or []
     plugin_dirs = defaults.get("plugin_dirs") or []
 
@@ -54,6 +57,7 @@ def load_config(path: Path) -> GeppettoConfig:
         aws_profile=str(aws_profile) if aws_profile else None,
         config_repo_path=Path(config_repo_path) if config_repo_path else None,
         config_repo_url=str(config_repo_url) if config_repo_url else None,
+        log_file=Path(log_file) if log_file else DEFAULT_LOG_FILE,
         plugin_modules=[str(m) for m in plugin_modules],
         plugin_dirs=[Path(p) for p in plugin_dirs],
     )

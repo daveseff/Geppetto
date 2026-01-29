@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 
 from geppetto_automation.executors import CommandResult, Executor
 from geppetto_automation.operations.remote import RemoteFileOperation, RpmInstallOperation
@@ -59,6 +60,38 @@ def test_remote_file_absent_removes(tmp_path: Path):
     result = op.apply(HostConfig("local"), RecordingExecutor())
     assert result.changed is True
     assert not dest.exists()
+
+
+def test_remote_file_etag_compare_skips_download(tmp_path: Path):
+    dest = tmp_path / "output.bin"
+    dest.write_text("payload")
+    etag = hashlib.md5(dest.read_bytes()).hexdigest()
+    responses = {
+        (
+            "aws",
+            "s3api",
+            "head-object",
+            "--bucket",
+            "bucket",
+            "--key",
+            "path/file.bin",
+            "--query",
+            "ETag",
+            "--output",
+            "text",
+        ): [CommandResult(["aws"], f'"{etag}"\n', "", 0)],
+    }
+    executor = RecordingExecutor(responses)
+    op = RemoteFileOperation(
+        {
+            "source": "s3://bucket/path/file.bin",
+            "dest": str(dest),
+            "compare": "etag",
+        }
+    )
+    result = op.apply(HostConfig("local"), executor)
+    assert result.changed is False
+    assert not any(cmd[:2] == ("aws", "s3") for cmd in executor.commands)
 
 
 def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):

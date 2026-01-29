@@ -52,6 +52,9 @@ class RemoteFileOperation(Operation):
         self.state = str(spec.get("state", "present"))
         if self.state not in {"present", "absent"}:
             raise ValueError("remote_file state must be 'present' or 'absent'")
+        self.compare = str(spec.get("compare", "bytes")).lower()
+        if self.compare not in {"bytes", "etag"}:
+            raise ValueError("remote_file compare must be 'bytes' or 'etag'")
         checksum = spec.get("checksum")
         self.checksum_algo: Optional[str] = None
         self.checksum_value: Optional[str] = None
@@ -72,6 +75,14 @@ class RemoteFileOperation(Operation):
             if not executor.dry_run:
                 self.dest.unlink()
             return ActionResult(host=host.name, action="remote_file", changed=True, details="removed")
+
+        if (
+            self.compare == "etag"
+            and str(self.source).startswith("s3://")
+            and self.dest.exists()
+            and self._s3_etag_matches(self.source, self.dest, executor)
+        ):
+            return ActionResult(host=host.name, action="remote_file", changed=False, details="noop")
 
         fetcher = RemoteFetcher(executor)
         tmp = fetcher.fetch(str(self.source))
@@ -107,6 +118,51 @@ class RemoteFileOperation(Operation):
             return None
         base = 8 if text.startswith("0") else 10
         return int(text, base)
+
+    @staticmethod
+    def _parse_s3(source: str) -> tuple[str, str]:
+        text = source[5:]
+        if "/" not in text:
+            raise ValueError(f"Invalid s3 source {source}")
+        bucket, key = text.split("/", 1)
+        return bucket, key
+
+    @staticmethod
+    def _md5_file(path: Path) -> str:
+        digest = hashlib.md5()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _s3_etag_matches(self, source: str, dest: Path, executor: Executor) -> bool:
+        try:
+            bucket, key = self._parse_s3(source)
+        except ValueError:
+            return False
+        result = executor.run(
+            [
+                "aws",
+                "s3api",
+                "head-object",
+                "--bucket",
+                bucket,
+                "--key",
+                key,
+                "--query",
+                "ETag",
+                "--output",
+                "text",
+            ],
+            check=False,
+            mutable=False,
+        )
+        if result.returncode != 0:
+            return False
+        etag = result.stdout.strip().strip('"')
+        if not etag or "-" in etag:
+            return False
+        return self._md5_file(dest) == etag
 
 
 class RpmInstallOperation(Operation):
