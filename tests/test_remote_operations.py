@@ -11,10 +11,12 @@ class RecordingExecutor(Executor):
         super().__init__(HostConfig(name="local"))
         self.responses = responses or {}
         self.commands: list[tuple[str, ...]] = []
+        self.invocations: list[tuple[tuple[str, ...], bool]] = []
 
     def run(self, command, *, check: bool = True, mutable: bool = True):  # type: ignore[override]
         key = tuple(command)
         self.commands.append(key)
+        self.invocations.append((key, mutable))
         queue = self.responses.get(key)
         if queue:
             result = queue.pop(0)
@@ -116,6 +118,15 @@ def test_remote_file_https_verify_tls_can_be_disabled(tmp_path: Path):
     op.apply(HostConfig("local"), executor)
     curl_cmd = next(cmd for cmd in executor.commands if cmd and cmd[0] == "curl")
     assert "-k" in curl_cmd
+
+
+def test_remote_file_fetch_commands_are_non_mutable_for_dry_run_compare(tmp_path: Path):
+    dest = tmp_path / "output.bin"
+    op = RemoteFileOperation({"source": "https://example.invalid/file.bin", "dest": str(dest)})
+    executor = RecordingExecutor()
+    op.apply(HostConfig("local"), executor)
+    curl_invocation = next((cmd, mutable) for cmd, mutable in executor.invocations if cmd and cmd[0] == "curl")
+    assert curl_invocation[1] is False
 
 
 def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):

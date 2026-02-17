@@ -21,13 +21,13 @@ class RemoteFetcher:
         os.close(tmp_fd)
         tmp_path = Path(tmp_name)
         if source.startswith("s3://"):
-            self.executor.run(["aws", "s3", "cp", source, str(tmp_path)])
+            self.executor.run(["aws", "s3", "cp", source, str(tmp_path)], mutable=False)
         elif source.startswith(("http://", "https://")):
             command = ["curl", "-fsSL"]
             if source.startswith("https://") and not verify_tls:
                 command.append("-k")
             command.extend([source, "-o", str(tmp_path)])
-            self.executor.run(command)
+            self.executor.run(command, mutable=False)
         elif source.startswith("file://"):
             shutil.copyfile(Path(source[7:]), tmp_path)
         else:
