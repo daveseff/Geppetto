@@ -16,14 +16,18 @@ class RemoteFetcher:
     def __init__(self, executor: Executor):
         self.executor = executor
 
-    def fetch(self, source: str) -> Path:
+    def fetch(self, source: str, *, verify_tls: bool = True) -> Path:
         tmp_fd, tmp_name = tempfile.mkstemp(prefix="geppetto-fetch-")
         os.close(tmp_fd)
         tmp_path = Path(tmp_name)
         if source.startswith("s3://"):
             self.executor.run(["aws", "s3", "cp", source, str(tmp_path)])
         elif source.startswith(("http://", "https://")):
-            self.executor.run(["curl", "-fsSL", source, "-o", str(tmp_path)])
+            command = ["curl", "-fsSL"]
+            if source.startswith("https://") and not verify_tls:
+                command.append("-k")
+            command.extend([source, "-o", str(tmp_path)])
+            self.executor.run(command)
         elif source.startswith("file://"):
             shutil.copyfile(Path(source[7:]), tmp_path)
         else:
@@ -55,6 +59,7 @@ class RemoteFileOperation(Operation):
         self.compare = str(spec.get("compare", "bytes")).lower()
         if self.compare not in {"bytes", "etag"}:
             raise ValueError("remote_file compare must be 'bytes' or 'etag'")
+        self.verify_tls = self._coerce_bool(spec.get("verify_tls", True), default=True)
         checksum = spec.get("checksum")
         self.checksum_algo: Optional[str] = None
         self.checksum_value: Optional[str] = None
@@ -85,7 +90,7 @@ class RemoteFileOperation(Operation):
             return ActionResult(host=host.name, action="remote_file", changed=False, details="noop")
 
         fetcher = RemoteFetcher(executor)
-        tmp = fetcher.fetch(str(self.source))
+        tmp = fetcher.fetch(str(self.source), verify_tls=self.verify_tls)
         try:
             new_bytes = tmp.read_bytes()
             if self.checksum_algo and self.checksum_value:
@@ -118,6 +123,21 @@ class RemoteFileOperation(Operation):
             return None
         base = 8 if text.startswith("0") else 10
         return int(text, base)
+
+    @staticmethod
+    def _coerce_bool(value: Optional[Any], *, default: bool = False) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "yes", "1", "on"}:
+                return True
+            if lowered in {"false", "no", "0", "off"}:
+                return False
+            raise ValueError(f"Unable to interpret boolean value '{value}'")
+        return bool(value)
 
     @staticmethod
     def _parse_s3(source: str) -> tuple[str, str]:

@@ -138,6 +138,7 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - `dest` (string): destination path. Required.
 - `mode` (int or string): file mode.
 - `compare` (bytes|etag, default bytes).
+- `verify_tls` (bool, default true): when false, HTTPS downloads allow self-signed certificates.
 - `variables` (map): template variables for templated sources.
 - `headers` (map): HTTP headers (for http/https sources).
 ## rpm

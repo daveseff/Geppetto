@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.1.3
+
+### Added
+- `remote_file` supports `verify_tls` for HTTPS sources; set `verify_tls = false` to allow self-signed certificates.
+
+## 0.1.2
+
+### Fixed
+- Clear previous progress line before printing a shorter pending status line.
+
 ## 0.1.1
 
 ### Changed

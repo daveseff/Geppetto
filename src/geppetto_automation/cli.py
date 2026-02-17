@@ -214,6 +214,8 @@ def print_progress(host, action) -> None:
     resource = _progress_resource(action.data)
     suffix = f"[{resource}]" if resource else ""
     line = f"{host.name}::{action.type}{suffix} pending..."
+    if _last_progress_len:
+        print(" " * _last_progress_len, end="\r", flush=True)
     _last_progress_len = len(line)
     print(colorize(line, Ansi.YELLOW), end="\r", flush=True)
 

@@ -1,18 +1,13 @@
 #!/bin/bash
 
-PAYLOAD=payload
-rm -rf "$PAYLOAD"
-mkdir -p "$PAYLOAD/usr" "$PAYLOAD/usr/bin" "$PAYLOAD/etc/geppetto"
+VER="${1}"
 
-wheel=$(ls -1t dist/geppetto_automation-*.whl 2>/dev/null | head -n1)
-if [[ -z "$wheel" ]]; then
-  echo "Unable to locate built geppetto_automation wheel in dist/" >&2
+if [ -z "${VER}" ]; then
+  echo "Usage: ./build.sh <version> "
   exit 1
 fi
 
-pip install "$wheel" --prefix "$PAYLOAD/usr"
+rsync -avP dist/geppetto_automation-${VER}.tar.gz ~/rpmbuild/SOURCES
+rsync -avP geppetto-automation.spec ~/rpmbuild/SPECS/
+rpmbuild -bb ~/rpmbuild/SPECS/geppetto-automation.spec && rpm -Uvh --force ~/rpmbuild/RPMS/noarch/geppetto_automation-${VER}-1.amzn2023.noarch.rpm
 
-cp scripts/geppetto-auto "$PAYLOAD/usr/bin/"
-chmod 755 "$PAYLOAD/usr/bin/geppetto-auto"
-
-cp examples/base_plan.fops "$PAYLOAD/etc/geppetto/"

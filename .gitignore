@@ -5,3 +5,4 @@ payload
 dist
 *.state.json
 debug
+build.sh

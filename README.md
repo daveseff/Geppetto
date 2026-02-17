@@ -65,6 +65,7 @@ task 'bootstrap' on ['local'] {
     source => 's3://geppetto-artifacts/bootstrap.sh'
     dest   => '/usr/local/bin/bootstrap.sh'
     mode   => '0755'
+    # verify_tls => false  # optional for HTTPS sources with self-signed certs
   }
 
   rpm { 'amazon-ssm-agent':

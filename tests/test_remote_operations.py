@@ -94,6 +94,30 @@ def test_remote_file_etag_compare_skips_download(tmp_path: Path):
     assert not any(cmd[:2] == ("aws", "s3") for cmd in executor.commands)
 
 
+def test_remote_file_https_verify_tls_enabled_by_default(tmp_path: Path):
+    dest = tmp_path / "output.bin"
+    op = RemoteFileOperation({"source": "https://example.invalid/file.bin", "dest": str(dest)})
+    executor = RecordingExecutor()
+    op.apply(HostConfig("local"), executor)
+    curl_cmd = next(cmd for cmd in executor.commands if cmd and cmd[0] == "curl")
+    assert "-k" not in curl_cmd
+
+
+def test_remote_file_https_verify_tls_can_be_disabled(tmp_path: Path):
+    dest = tmp_path / "output.bin"
+    op = RemoteFileOperation(
+        {
+            "source": "https://example.invalid/file.bin",
+            "dest": str(dest),
+            "verify_tls": False,
+        }
+    )
+    executor = RecordingExecutor()
+    op.apply(HostConfig("local"), executor)
+    curl_cmd = next(cmd for cmd in executor.commands if cmd and cmd[0] == "curl")
+    assert "-k" in curl_cmd
+
+
 def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):
     rpm_pkg = tmp_path / "pkg.rpm"
     rpm_pkg.write_text("rpmdata")
