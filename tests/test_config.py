@@ -21,6 +21,12 @@ def test_load_config_overrides(tmp_path: Path) -> None:
         aws_profile = "myprofile"
         config_repo_path = "/opt/geppetto/config"
         config_repo_url = "https://example.invalid/geppetto-config.git"
+        config_service_url = "https://config.example.invalid"
+        config_service_path = "/var/lib/geppetto/config"
+        config_service_host = "host1"
+        config_service_ca_cert = "/etc/geppetto/pki/ca.crt"
+        config_service_client_cert = "/etc/geppetto/pki/host1.crt"
+        config_service_client_key = "/etc/geppetto/pki/host1.key"
         log_file = "/var/log/geppetto/custom.log"
         plugin_modules = ["my.plugins.ops"]
         plugin_dirs = ["/opt/geppetto/plugins"]
@@ -35,6 +41,12 @@ def test_load_config_overrides(tmp_path: Path) -> None:
     assert config.aws_profile == "myprofile"
     assert config.config_repo_path == Path("/opt/geppetto/config")
     assert config.config_repo_url == "https://example.invalid/geppetto-config.git"
+    assert config.config_service_url == "https://config.example.invalid"
+    assert config.config_service_path == Path("/var/lib/geppetto/config")
+    assert config.config_service_host == "host1"
+    assert config.config_service_ca_cert == Path("/etc/geppetto/pki/ca.crt")
+    assert config.config_service_client_cert == Path("/etc/geppetto/pki/host1.crt")
+    assert config.config_service_client_key == Path("/etc/geppetto/pki/host1.key")
     assert config.log_file == Path("/var/log/geppetto/custom.log")
     assert config.plugin_modules == ["my.plugins.ops"]
     assert config.plugin_dirs == [Path("/opt/geppetto/plugins")]

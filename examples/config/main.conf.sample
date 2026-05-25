@@ -21,6 +21,16 @@ log_file = "/var/log/geppetto/geppetto.log"
 # config_repo_path = "/etc/geppetto/config"
 # config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
 
+# Optional: REST-backed config service. If set, geppetto-auto will download a
+# host-specific config bundle into config_service_path before running. Leave
+# plan unset to use /etc/geppetto/config/hosts/<hostname>/plan.fops automatically.
+# config_service_url = "https://config.example.com"
+# config_service_path = "/etc/geppetto/config"
+# config_service_host = "host1"
+# config_service_ca_cert = "/etc/geppetto/pki/ca.crt"
+# config_service_client_cert = "/etc/geppetto/pki/host1.crt"
+# config_service_client_key = "/etc/geppetto/pki/host1.key"
+
 # Optional: plugin modules/dirs to extend operations. Each module/file may define
 # register_operations(registry) to add custom actions.
 # plugin_modules = ["yourpackage.geppetto_plugins"]

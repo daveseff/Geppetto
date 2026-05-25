@@ -11,7 +11,8 @@ from typing import Optional, Sequence
 import importlib
 import importlib.util
 
-from .config import load_config
+from .config import DEFAULT_PLAN, load_config
+from .config_service import resolve_config_service_host, sync_config_service
 from .dsl import DSLParseError
 from .inventory import InventoryLoader
 from .runner import TaskRunner
@@ -110,16 +111,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     configure_logging(args.log_level, log_file=cfg.log_file)
     _apply_aws_env(cfg)
     try:
+        _validate_config_sources(cfg)
         _load_plugins(cfg)
     except RuntimeError as exc:
         print(colorize(f"Plugin load failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
     try:
+        _sync_config_service(cfg)
         _sync_config_repo(cfg)
     except RuntimeError as exc:
         print(colorize(f"Config sync failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
-    plan_path = args.plan or cfg.plan
+    plan_path = _resolve_plan_path(args.plan, cfg)
     loader = InventoryLoader()
     try:
         plan = loader.load(plan_path)
@@ -332,6 +335,27 @@ def _current_branch(repo_path: Path) -> str:
         if branch:
             return branch
     return "master"
+
+
+def _sync_config_service(cfg) -> None:
+    if not getattr(cfg, "config_service_url", None):
+        return
+    sync_config_service(cfg)
+
+
+def _resolve_plan_path(cli_plan: Optional[Path], cfg) -> Path:
+    if cli_plan is not None:
+        return cli_plan
+    service_path = getattr(cfg, "config_service_path", None)
+    if service_path and cfg.plan == DEFAULT_PLAN:
+        host_name = resolve_config_service_host(cfg)
+        return Path(service_path) / "hosts" / host_name / "plan.fops"
+    return cfg.plan
+
+
+def _validate_config_sources(cfg) -> None:
+    if getattr(cfg, "config_repo_path", None) and getattr(cfg, "config_service_url", None):
+        raise RuntimeError("configure either config_repo_path or config_service_url, not both")
 
 
 def _apply_aws_env(cfg) -> None:

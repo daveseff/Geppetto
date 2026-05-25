@@ -23,6 +23,12 @@ class GeppettoConfig:
     aws_profile: Optional[str] = None
     config_repo_path: Optional[Path] = None
     config_repo_url: Optional[str] = None
+    config_service_url: Optional[str] = None
+    config_service_path: Optional[Path] = None
+    config_service_host: Optional[str] = None
+    config_service_ca_cert: Optional[Path] = None
+    config_service_client_cert: Optional[Path] = None
+    config_service_client_key: Optional[Path] = None
     log_file: Optional[Path] = DEFAULT_LOG_FILE
     plugin_modules: list[str] = field(default_factory=list)
     plugin_dirs: list[Path] = field(default_factory=list)
@@ -40,6 +46,12 @@ def load_config(path: Path) -> GeppettoConfig:
     aws_profile = defaults.get("aws_profile")
     config_repo_path = defaults.get("config_repo_path")
     config_repo_url = defaults.get("config_repo_url")
+    config_service_url = defaults.get("config_service_url")
+    config_service_path = defaults.get("config_service_path")
+    config_service_host = defaults.get("config_service_host")
+    config_service_ca_cert = defaults.get("config_service_ca_cert")
+    config_service_client_cert = defaults.get("config_service_client_cert")
+    config_service_client_key = defaults.get("config_service_client_key")
     log_file = defaults.get("log_file")
     plugin_modules = defaults.get("plugin_modules") or []
     plugin_dirs = defaults.get("plugin_dirs") or []
@@ -57,6 +69,12 @@ def load_config(path: Path) -> GeppettoConfig:
         aws_profile=str(aws_profile) if aws_profile else None,
         config_repo_path=Path(config_repo_path) if config_repo_path else None,
         config_repo_url=str(config_repo_url) if config_repo_url else None,
+        config_service_url=str(config_service_url) if config_service_url else None,
+        config_service_path=Path(config_service_path) if config_service_path else None,
+        config_service_host=str(config_service_host) if config_service_host else None,
+        config_service_ca_cert=Path(config_service_ca_cert) if config_service_ca_cert else None,
+        config_service_client_cert=Path(config_service_client_cert) if config_service_client_cert else None,
+        config_service_client_key=Path(config_service_client_key) if config_service_client_key else None,
         log_file=Path(log_file) if log_file else DEFAULT_LOG_FILE,
         plugin_modules=[str(m) for m in plugin_modules],
         plugin_dirs=[Path(p) for p in plugin_dirs],
