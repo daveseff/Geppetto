@@ -12,7 +12,13 @@ import importlib
 import importlib.util
 
 from .config import DEFAULT_PLAN, load_config
-from .config_service import resolve_config_service_host, sync_config_service
+from .config_service import (
+    agent_certificate_status,
+    clean_agent_certificate,
+    ensure_agent_certificate,
+    resolve_config_service_host,
+    sync_config_service,
+)
 from .dsl import DSLParseError
 from .inventory import InventoryLoader
 from .runner import TaskRunner
@@ -75,6 +81,28 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def parse_cert_args(argv: Sequence[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Manage Geppetto agent certificates")
+    config_arg = argparse.ArgumentParser(add_help=False)
+    config_arg.add_argument(
+        "--config",
+        type=Path,
+        default=Path("/etc/geppetto/main.conf"),
+        help="Path to geppetto config file (default: /etc/geppetto/main.conf)",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("init", parents=[config_arg], help="Fetch CA, generate key/CSR, and submit CSR")
+    subparsers.add_parser("status", parents=[config_arg], help="Show local agent certificate state")
+    subparsers.add_parser("clean", parents=[config_arg], help="Remove local client key, CSR, and certificate")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("/etc/geppetto/main.conf"),
+        help=argparse.SUPPRESS,
+    )
+    return parser.parse_args(argv)
+
+
 def configure_logging(level: str, *, log_file: Optional[Path]) -> None:
     log_level = getattr(logging, level.upper(), logging.INFO)
     handlers: list[logging.Handler] = []
@@ -102,6 +130,9 @@ def configure_logging(level: str, *, log_file: Optional[Path]) -> None:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    argv = list(argv if argv is not None else sys.argv[1:])
+    if argv and argv[0] == "cert":
+        return cert_main(argv[1:])
     args = parse_args(argv)
     if args.version:
         print(_version_string())
@@ -183,6 +214,37 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(summary.render())
 
     return 0
+
+
+def cert_main(argv: Sequence[str]) -> int:
+    args = parse_cert_args(argv)
+    cfg = load_config(args.config)
+    configure_logging("INFO", log_file=None)
+    try:
+        if args.command == "init":
+            ensure_agent_certificate(cfg)
+            print("agent certificate initialized")
+            return 0
+        if args.command == "status":
+            status = agent_certificate_status(cfg)
+            print(f"host: {status['host']}")
+            print(f"ca_cert: {status['ca_cert']}")
+            print(f"client_cert: {status['client_cert']}")
+            print(f"client_key: {status['client_key']}")
+            print(f"csr: {status['csr']}")
+            return 0
+        if args.command == "clean":
+            removed = clean_agent_certificate(cfg)
+            if not removed:
+                print("no local agent certificate files to remove")
+                return 0
+            for path in removed:
+                print(f"removed {path}")
+            return 0
+    except RuntimeError as exc:
+        print(colorize(f"Certificate management failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
+    return 1
 
 
 def format_result(result: ActionResult) -> str:

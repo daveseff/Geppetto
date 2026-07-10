@@ -9,7 +9,14 @@ from urllib.error import HTTPError
 import pytest
 
 from geppetto_automation.config import DEFAULT_PLAN, GeppettoConfig
-from geppetto_automation.config_service import _build_https_opener, resolve_config_service_host, sync_config_service
+from geppetto_automation.config_service import (
+    _build_https_opener,
+    _ensure_mtls_material,
+    agent_certificate_status,
+    clean_agent_certificate,
+    resolve_config_service_host,
+    sync_config_service,
+)
 from geppetto_automation.cli import _resolve_plan_path, _validate_config_sources
 
 
@@ -50,6 +57,7 @@ def test_sync_config_service_writes_bundle(tmp_path: Path, monkeypatch: pytest.M
             return FakeResponse()
 
     monkeypatch.setattr("geppetto_automation.config_service._build_https_opener", lambda cfg: FakeOpener())
+    monkeypatch.setattr("geppetto_automation.config_service._ensure_mtls_material", lambda cfg, host, url: None)
 
     sync_config_service(cfg)
 
@@ -83,6 +91,7 @@ def test_sync_config_service_replaces_existing_tree(tmp_path: Path, monkeypatch:
             return FakeResponse()
 
     monkeypatch.setattr("geppetto_automation.config_service._build_https_opener", lambda cfg: FakeOpener())
+    monkeypatch.setattr("geppetto_automation.config_service._ensure_mtls_material", lambda cfg, host, url: None)
 
     sync_config_service(cfg)
 
@@ -109,6 +118,7 @@ def test_sync_config_service_surfaces_http_error(tmp_path: Path, monkeypatch: py
             raise err
 
     monkeypatch.setattr("geppetto_automation.config_service._build_https_opener", lambda cfg: FakeOpener())
+    monkeypatch.setattr("geppetto_automation.config_service._ensure_mtls_material", lambda cfg, host, url: None)
 
     with pytest.raises(RuntimeError, match="host not found"):
         sync_config_service(cfg)
@@ -160,6 +170,86 @@ def test_build_https_opener_uses_client_material(tmp_path: Path, monkeypatch: py
 
     assert opener[0] == "opener"
     assert loaded == {"certfile": str(cert), "keyfile": str(key)}
+
+
+def test_ensure_mtls_material_generates_and_submits_csr(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ca = tmp_path / "ca.crt"
+    cert = tmp_path / "host1.crt"
+    key = tmp_path / "host1.key"
+    cfg = GeppettoConfig(
+        config_service_ca_cert=ca,
+        config_service_client_cert=cert,
+        config_service_client_key=key,
+    )
+    calls: list[str] = []
+
+    def fetch_ca(service_url: str, ca_cert: Path) -> None:
+        calls.append("fetch")
+        ca_cert.write_text("ca")
+
+    def generate(host_name: str, client_key: Path, csr_path: Path) -> None:
+        calls.append("generate")
+        client_key.write_text("key")
+        csr_path.write_text("csr")
+
+    def submit(cfg, host_name: str, service_url: str, ca_cert: Path, client_cert: Path, csr_path: Path) -> None:
+        calls.append("submit")
+        client_cert.write_text("cert")
+
+    monkeypatch.setattr("geppetto_automation.config_service._fetch_ca_cert", fetch_ca)
+    monkeypatch.setattr("geppetto_automation.config_service._generate_client_csr", generate)
+    monkeypatch.setattr("geppetto_automation.config_service._submit_csr", submit)
+
+    _ensure_mtls_material(cfg, "host1", "https://config.example.invalid")
+
+    assert calls == ["fetch", "generate", "submit"]
+    assert cert.read_text() == "cert"
+
+
+def test_ensure_mtls_material_uses_default_pki_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    default_pki = tmp_path / "pki"
+    cfg = GeppettoConfig()
+    calls: list[Path] = []
+
+    monkeypatch.setattr("geppetto_automation.config_service.DEFAULT_PKI_DIR", default_pki)
+    def fetch_ca(service_url: str, ca_cert: Path) -> None:
+        ca_cert.parent.mkdir(parents=True)
+        ca_cert.write_text("ca")
+
+    monkeypatch.setattr("geppetto_automation.config_service._fetch_ca_cert", fetch_ca)
+    monkeypatch.setattr(
+        "geppetto_automation.config_service._generate_client_csr",
+        lambda host_name, client_key, csr_path: (client_key.write_text("key"), csr_path.write_text("csr"), calls.append(client_key)),
+    )
+    monkeypatch.setattr(
+        "geppetto_automation.config_service._submit_csr",
+        lambda cfg, host_name, service_url, ca_cert, client_cert, csr_path: client_cert.write_text("cert"),
+    )
+
+    _ensure_mtls_material(cfg, "host1", "https://config.example.invalid")
+
+    assert cfg.config_service_ca_cert == default_pki / "ca.crt"
+    assert cfg.config_service_client_cert == default_pki / "host1.crt"
+    assert cfg.config_service_client_key == default_pki / "host1.key"
+    assert calls == [default_pki / "host1.key"]
+
+
+def test_agent_certificate_status_and_clean_use_default_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    default_pki = tmp_path / "pki"
+    monkeypatch.setattr("geppetto_automation.config_service.DEFAULT_PKI_DIR", default_pki)
+    cfg = GeppettoConfig(config_service_host="host1")
+    default_pki.mkdir()
+    for name in ("host1.crt", "host1.key", "host1.csr"):
+        (default_pki / name).write_text(name)
+
+    status = agent_certificate_status(cfg)
+    removed = clean_agent_certificate(cfg)
+
+    assert status["client_cert"] == f"present:{default_pki / 'host1.crt'}"
+    assert removed == [default_pki / "host1.csr", default_pki / "host1.crt", default_pki / "host1.key"]
 
 
 def test_resolve_plan_path_uses_service_bundle_by_default(tmp_path: Path) -> None:

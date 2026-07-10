@@ -27,6 +27,10 @@ log_file = "/var/log/geppetto/geppetto.log"
 # config_service_url = "https://config.example.com"
 # config_service_path = "/etc/geppetto/config"
 # config_service_host = "host1"
+# If these files are missing, geppetto-auto fetches the CA, creates a key/CSR,
+# and submits the CSR to the server for signing.
+# If omitted, these default to /etc/geppetto/pki/ca.crt and
+# /etc/geppetto/pki/<hostname>.{crt,key}.
 # config_service_ca_cert = "/etc/geppetto/pki/ca.crt"
 # config_service_client_cert = "/etc/geppetto/pki/host1.crt"
 # config_service_client_key = "/etc/geppetto/pki/host1.key"

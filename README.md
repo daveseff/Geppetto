@@ -281,18 +281,18 @@ The command emits a `.deb` in the current directory. Install with `sudo dpkg -i 
 
 ### Arch Linux packaging (native makepkg)
 
-A simple `makepkg` flow using the sample PKGBUILD under `examples/packaging/`:
+A simple `makepkg` flow using the PKGBUILD under `packaging/`:
 
 ```bash
 sudo pacman -S --needed base-devel python-build python-installer python-wheel python-hatchling
-python3 -m build --sdist                     # creates dist/geppetto-automation-<ver>.tar.gz
-cp dist/geppetto_automation-*.tar.gz examples/packaging/
-cd examples/packaging
-makepkg -sf                                  # builds a .pkg.tar.zst (run as a normal user)
-sudo pacman -U ./*.pkg.tar.zst               # install system-wide
+cd packaging
+makepkg -si
 ```
 
-Adjust `pkgver` in `examples/packaging/PKGBUILD` to match the sdist. The PKGBUILD uses system Python tooling (hatchling backend) and installs via `python -m installer`, and it seeds `/etc/geppetto` with sample config/plan/templates.
+The PKGBUILD builds from the parent checkout, so it works directly from
+`Geppetto/packaging` without manually creating an sdist first. It uses system
+Python tooling (hatchling backend), installs via `python -m installer`, and
+seeds `/etc/geppetto` with sample config/plan/templates.
 
 ## Extending toward agents or server mode
 
@@ -322,6 +322,11 @@ log_file = "/var/log/geppetto/geppetto.log"
 # before each run (including dry-runs), discarding local edits to match origin.
 # config_repo_path = "/etc/geppetto/config"
 # config_repo_url  = "git@github.com:yourorg/geppetto-config.git"
+# REST config service. Agents bootstrap CA/client certs into /etc/geppetto/pki
+# when cert paths are omitted, then submit a CSR to the server.
+# config_service_url = "https://config.example.com:8443"
+# config_service_path = "/etc/geppetto/config"
+# config_service_host = "host1"
 # Optional plugins: modules or .py files that expose register_operations(registry)
 # to add custom resources.
 # plugin_modules = ["yourpackage.geppetto_plugins"]
@@ -330,6 +335,18 @@ log_file = "/var/log/geppetto/geppetto.log"
 ```
 
 Values supplied on the CLI always win, but the config file lets you centralize shared settings (plan/state/template directories) across hosts.
+
+Agent certificate lifecycle commands:
+
+```
+geppetto-auto cert status
+geppetto-auto cert init
+geppetto-auto cert clean
+```
+
+`cert init` fetches the server CA, creates `/etc/geppetto/pki/<hostname>.key`
+and a CSR, then submits it to the config server. After the server signs the CSR,
+rerun `geppetto-auto` or `geppetto-auto cert init` to download the signed cert.
 
 ## Plugins
 

@@ -3,9 +3,11 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import shutil
 import ssl
 import socket
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -13,6 +15,7 @@ from urllib import error, request
 
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_PKI_DIR = Path("/etc/geppetto/pki")
 
 
 def resolve_config_service_host(cfg) -> str:
@@ -29,6 +32,7 @@ def sync_config_service(cfg) -> None:
         raise RuntimeError("config_service_url requires config_service_path")
 
     host_name = resolve_config_service_host(cfg)
+    _ensure_mtls_material(cfg, host_name, str(service_url).rstrip("/"))
     bundle_url = f"{str(service_url).rstrip('/')}/v1/configs/{host_name}/bundle"
     headers = {
         "Accept": "application/zip",
@@ -50,6 +54,38 @@ def sync_config_service(cfg) -> None:
     _extract_bundle(body, repo_path)
 
 
+def ensure_agent_certificate(cfg) -> None:
+    service_url = getattr(cfg, "config_service_url", None)
+    if not service_url:
+        raise RuntimeError("config_service_url is required for certificate enrollment")
+    host_name = resolve_config_service_host(cfg)
+    _ensure_mtls_material(cfg, host_name, str(service_url).rstrip("/"))
+
+
+def agent_certificate_status(cfg) -> dict[str, str]:
+    host_name = resolve_config_service_host(cfg)
+    ca_cert, client_cert, client_key = _resolve_mtls_paths(cfg, host_name)
+    csr_path = client_cert.with_suffix(".csr")
+    return {
+        "host": host_name,
+        "ca_cert": _path_state(ca_cert),
+        "client_cert": _path_state(client_cert),
+        "client_key": _path_state(client_key),
+        "csr": _path_state(csr_path),
+    }
+
+
+def clean_agent_certificate(cfg) -> list[Path]:
+    host_name = resolve_config_service_host(cfg)
+    ca_cert, client_cert, client_key = _resolve_mtls_paths(cfg, host_name)
+    removed: list[Path] = []
+    for path in (client_cert.with_suffix(".csr"), client_cert, client_key):
+        if path.exists():
+            path.unlink()
+            removed.append(path)
+    return removed
+
+
 def _build_https_opener(cfg):
     client_cert = getattr(cfg, "config_service_client_cert", None)
     client_key = getattr(cfg, "config_service_client_key", None)
@@ -66,6 +102,129 @@ def _build_https_opener(cfg):
 
 def _optional_str(path: Path | None) -> str | None:
     return str(path) if path else None
+
+
+def _ensure_mtls_material(cfg, host_name: str, service_url: str) -> None:
+    ca_cert, client_cert, client_key = _resolve_mtls_paths(cfg, host_name)
+
+    if not ca_cert.exists():
+        _fetch_ca_cert(service_url, ca_cert)
+    if client_cert.exists() and client_key.exists():
+        return
+    if client_cert.exists() and not client_key.exists():
+        raise RuntimeError(f"client certificate exists but private key is missing: {client_key}")
+
+    csr_path = client_cert.with_suffix(".csr")
+    if not client_key.exists() or not csr_path.exists():
+        _generate_client_csr(host_name, client_key, csr_path)
+    _submit_csr(cfg, host_name, service_url, ca_cert, client_cert, csr_path)
+
+
+def _resolve_mtls_paths(cfg, host_name: str) -> tuple[Path, Path, Path]:
+    ca_cert = Path(getattr(cfg, "config_service_ca_cert", None) or DEFAULT_PKI_DIR / "ca.crt")
+    client_cert = Path(getattr(cfg, "config_service_client_cert", None) or DEFAULT_PKI_DIR / f"{host_name}.crt")
+    client_key = Path(getattr(cfg, "config_service_client_key", None) or DEFAULT_PKI_DIR / f"{host_name}.key")
+    cfg.config_service_ca_cert = ca_cert
+    cfg.config_service_client_cert = client_cert
+    cfg.config_service_client_key = client_key
+    return ca_cert, client_cert, client_key
+
+
+def _path_state(path: Path) -> str:
+    return f"present:{path}" if path.exists() else f"missing:{path}"
+
+
+def _fetch_ca_cert(service_url: str, ca_cert: Path) -> None:
+    ca_url = f"{service_url}/v1/ca"
+    ca_cert.parent.mkdir(parents=True, exist_ok=True)
+    context = ssl._create_unverified_context()  # noqa: SLF001
+    opener = request.build_opener(request.HTTPSHandler(context=context))
+    try:
+        with opener.open(request.Request(ca_url, headers={"Accept": "application/x-pem-file"})) as response:
+            payload = response.read()
+    except error.URLError as exc:
+        raise RuntimeError(f"failed to fetch config service CA from {ca_url}: {exc.reason}") from exc
+    ca_cert.write_bytes(payload)
+
+
+def _generate_client_csr(host_name: str, client_key: Path, csr_path: Path) -> None:
+    client_key.parent.mkdir(parents=True, exist_ok=True)
+    csr_path.parent.mkdir(parents=True, exist_ok=True)
+    if not client_key.exists():
+        cmd = [
+            "openssl",
+            "req",
+            "-new",
+            "-newkey",
+            "rsa:4096",
+            "-nodes",
+            "-keyout",
+            str(client_key),
+            "-subj",
+            f"/CN={host_name}",
+            "-out",
+            str(csr_path),
+        ]
+    else:
+        cmd = [
+            "openssl",
+            "req",
+            "-new",
+            "-key",
+            str(client_key),
+            "-subj",
+            f"/CN={host_name}",
+            "-out",
+            str(csr_path),
+        ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"failed to generate client CSR: {detail}")
+    try:
+        os.chmod(client_key, 0o600)
+    except OSError:
+        LOGGER.warning("Unable to chmod private key %s", client_key)
+
+
+def _submit_csr(cfg, host_name: str, service_url: str, ca_cert: Path, client_cert: Path, csr_path: Path) -> None:
+    csr_url = f"{service_url}/v1/csr/{host_name}"
+    context = ssl.create_default_context(cafile=str(ca_cert))
+    opener = request.build_opener(request.HTTPSHandler(context=context))
+    req = request.Request(
+        csr_url,
+        data=csr_path.read_bytes(),
+        headers={"Content-Type": "application/pkcs10", "Accept": "application/x-pem-file, application/json"},
+        method="POST",
+    )
+    try:
+        with opener.open(req) as response:
+            payload = response.read()
+            status = getattr(response, "status", response.getcode())
+    except error.HTTPError as exc:
+        detail = _http_error_detail(exc)
+        raise RuntimeError(f"CSR submission failed for {host_name}: {detail}") from exc
+    except error.URLError as exc:
+        raise RuntimeError(f"CSR submission failed for {host_name}: {exc.reason}") from exc
+
+    if status == 200:
+        client_cert.parent.mkdir(parents=True, exist_ok=True)
+        client_cert.write_bytes(payload)
+        return
+    if status == 202:
+        detail = _json_detail(payload) or "certificate signing request is pending approval"
+        raise RuntimeError(detail)
+    raise RuntimeError(f"unexpected CSR response status: HTTP {status}")
+
+
+def _json_detail(payload: bytes) -> str:
+    try:
+        parsed = json.loads(payload.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        return ""
+    if isinstance(parsed, dict):
+        return str(parsed.get("detail") or "")
+    return ""
 
 
 def _http_error_detail(exc: error.HTTPError) -> str:

@@ -1,7 +1,7 @@
 # Maintainer: Geppetto Maintainers <noreply@example.invalid>
 
 pkgname=geppetto_automation
-pkgver=0.0.6
+pkgver=0.1.3
 pkgrel=1
 pkgdesc="Lightweight automation toolkit for declarative host config"
 arch=('any')
@@ -9,10 +9,39 @@ url="https://github.com/daveseff/Geppetto"
 license=('MIT')
 depends=('python' 'python-jinja' 'python-boto3' 'python-tomli')
 makedepends=('python-build' 'python-installer' 'python-wheel' 'python-hatchling')
-source=("$pkgname-$pkgver.tar.gz")
-sha256sums=('SKIP')
+source=()
+sha256sums=()
 _py="/usr/bin/python"
 _env="env -u VIRTUAL_ENV -u PYTHONHOME -u PIP_REQUIRE_VIRTUALENV PYTHONNOUSERSITE=1"
+backup=(
+  'etc/geppetto/plan.fops.sample'
+  'etc/geppetto/main.conf.sample'
+  'etc/geppetto/config/defaults/packages.fops'
+  'etc/geppetto/config/defaults/users.fops'
+  'etc/geppetto/config/groups/staging/execs.fops'
+  'etc/geppetto/config/groups/staging/mounts.fops'
+  'etc/geppetto/config/hosts/host1/keys.fops'
+  'etc/geppetto/config/hosts/host1/plan.fops'
+  'etc/geppetto/config/templates/motd.tmpl'
+)
+
+prepare() {
+  rm -rf "$srcdir/$pkgname-$pkgver"
+  mkdir -p "$srcdir/$pkgname-$pkgver"
+
+  # Build from the parent checkout so `makepkg -si` works directly in packaging/.
+  tar -C "$startdir/.." \
+      --exclude './.git' \
+      --exclude './.pytest_cache' \
+      --exclude './build' \
+      --exclude './dist' \
+      --exclude './*.egg-info' \
+      --exclude './packaging/pkg' \
+      --exclude './packaging/src' \
+      --exclude './packaging/*.pkg.tar*' \
+      --exclude './examples/packaging' \
+      -cf - . | tar -C "$srcdir/$pkgname-$pkgver" -xf -
+}
 
 build() {
   cd "$srcdir/$pkgname-$pkgver"
@@ -32,8 +61,8 @@ package() {
              "$pkgdir/etc/geppetto/config/templates"
   install -m644 examples/plan.fops "$pkgdir/etc/geppetto/plan.fops.sample"
   install -m644 examples/config/main.conf.sample "$pkgdir/etc/geppetto/main.conf.sample"
-  install -m644 examples/config/defaults/"*.fops" "$pkgdir/etc/geppetto/config/defaults/"
-  install -m644 examples/config/groups/staging/"*.fops" "$pkgdir/etc/geppetto/config/groups/staging/"
-  install -m644 examples/config/hosts/host1/"*.fops" "$pkgdir/etc/geppetto/config/hosts/host1/"
+  install -m644 examples/config/defaults/*.fops "$pkgdir/etc/geppetto/config/defaults/"
+  install -m644 examples/config/groups/staging/*.fops "$pkgdir/etc/geppetto/config/groups/staging/"
+  install -m644 examples/config/hosts/host1/*.fops "$pkgdir/etc/geppetto/config/hosts/host1/"
   install -m644 examples/config/templates/motd.tmpl "$pkgdir/etc/geppetto/config/templates/motd.tmpl"
 }
