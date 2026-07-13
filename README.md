@@ -224,6 +224,17 @@ If the loader detects a `.fops` extension (or the DSL syntax), it automatically 
 
 The CLI returns zero on success and prints a concise status line per host/action pair. If you provide no path argument the runner defaults to `/etc/geppetto/plan.fops`, and relative template references resolve beneath `/etc/geppetto` (or whatever directory the plan lives in). Each run also maintains a state file (`plan.fops.state.json` by default) so that removing a resource from the plan automatically triggers the appropriate teardown (file removal, user deletion, unmounts, etc.). You can override the state location via `--state-file`.
 
+Help is available either as flags or commands:
+
+```bash
+geppetto-auto --help
+geppetto-auto help
+geppetto-auto help cert
+geppetto-auto help cert init
+geppetto-auto cert help
+geppetto-auto cert init help
+```
+
 ### Tests
 
 Unit tests live under `tests/` and use `pytest`:
@@ -345,8 +356,14 @@ geppetto-auto cert clean
 ```
 
 `cert init` fetches the server CA, creates `/etc/geppetto/pki/<hostname>.key`
-and a CSR, then submits it to the config server. After the server signs the CSR,
-rerun `geppetto-auto` or `geppetto-auto cert init` to download the signed cert.
+and a CSR, then submits it to the config server. If the server returns `202
+Accepted`, sign the CSR on the server with `geppetto-config-server cert sign
+<hostname>`, then rerun `geppetto-auto` or `geppetto-auto cert init` to download
+the signed cert. `cert clean` removes the local CSR, client cert, client key,
+and cached CA so the agent can re-enroll cleanly after a server CA rotation.
+`cert status` colorizes certificate state when stdout is a terminal: present is
+green, missing is red, and expired certificates are yellow. Set `NO_COLOR=1` to
+disable color output.
 
 ## Plugins
 

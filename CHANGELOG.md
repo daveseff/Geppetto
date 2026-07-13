@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.2.0
+
+### Added
+- REST-backed config service sync with mTLS.
+- Puppet-style agent certificate bootstrap under `/etc/geppetto/pki`.
+- Agent certificate CLI commands: `geppetto-auto cert init`, `status`, and `clean`.
+- Command-style help, including `geppetto-auto help` and nested help commands.
+- Root-level Arch packaging under `packaging/`.
+
 ## 0.1.3
 
 ### Added

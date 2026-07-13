@@ -47,7 +47,16 @@ _last_progress_len = 0
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Geppetto automation runner")
+    parser = argparse.ArgumentParser(
+        description="Geppetto automation runner",
+        epilog=(
+            "Certificate commands:\n"
+            "  geppetto-auto cert init      Fetch CA, generate key/CSR, and submit CSR\n"
+            "  geppetto-auto cert status    Show local agent certificate state\n"
+            "  geppetto-auto cert clean     Remove local agent certificate material"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "plan",
         nargs="?",
@@ -82,7 +91,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def parse_cert_args(argv: Sequence[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Manage Geppetto agent certificates")
+    parser = argparse.ArgumentParser(prog="geppetto-auto cert", description="Manage Geppetto agent certificates")
     config_arg = argparse.ArgumentParser(add_help=False)
     config_arg.add_argument(
         "--config",
@@ -91,9 +100,24 @@ def parse_cert_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Path to geppetto config file (default: /etc/geppetto/main.conf)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("init", parents=[config_arg], help="Fetch CA, generate key/CSR, and submit CSR")
-    subparsers.add_parser("status", parents=[config_arg], help="Show local agent certificate state")
-    subparsers.add_parser("clean", parents=[config_arg], help="Remove local client key, CSR, and certificate")
+    subparsers.add_parser(
+        "init",
+        parents=[config_arg],
+        help="Fetch CA, generate key/CSR, and submit CSR",
+        description="Fetch CA, generate key/CSR, and submit CSR",
+    )
+    subparsers.add_parser(
+        "status",
+        parents=[config_arg],
+        help="Show local agent certificate state",
+        description="Show local agent certificate state",
+    )
+    subparsers.add_parser(
+        "clean",
+        parents=[config_arg],
+        help="Remove local client key, CSR, CA, and certificate",
+        description="Remove local client key, CSR, CA, and certificate",
+    )
     parser.add_argument(
         "--config",
         type=Path,
@@ -131,6 +155,10 @@ def configure_logging(level: str, *, log_file: Optional[Path]) -> None:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
+    if argv and argv[0] == "help":
+        return help_main(argv[1:])
+    if argv and argv[-1] == "help":
+        return help_main(argv[:-1])
     if argv and argv[0] == "cert":
         return cert_main(argv[1:])
     args = parse_args(argv)
@@ -216,7 +244,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return 0
 
 
+def help_main(argv: Sequence[str]) -> int:
+    try:
+        if not argv:
+            parse_args(["--help"])
+        if argv[0] == "cert":
+            if len(argv) == 1:
+                parse_cert_args(["--help"])
+            else:
+                parse_cert_args([*argv[1:], "--help"])
+        else:
+            parse_args([*argv, "--help"])
+    except SystemExit as exc:
+        return int(exc.code or 0)
+    return 0
+
+
 def cert_main(argv: Sequence[str]) -> int:
+    if argv and argv[0] == "help":
+        try:
+            if len(argv) == 1:
+                parse_cert_args(["--help"])
+            else:
+                parse_cert_args([*argv[1:], "--help"])
+        except SystemExit as exc:
+            return int(exc.code or 0)
+        return 0
+    if argv and argv[-1] == "help":
+        try:
+            parse_cert_args([*argv[:-1], "--help"])
+        except SystemExit as exc:
+            return int(exc.code or 0)
+        return 0
     args = parse_cert_args(argv)
     cfg = load_config(args.config)
     configure_logging("INFO", log_file=None)
@@ -228,10 +287,8 @@ def cert_main(argv: Sequence[str]) -> int:
         if args.command == "status":
             status = agent_certificate_status(cfg)
             print(f"host: {status['host']}")
-            print(f"ca_cert: {status['ca_cert']}")
-            print(f"client_cert: {status['client_cert']}")
-            print(f"client_key: {status['client_key']}")
-            print(f"csr: {status['csr']}")
+            for key in ("ca_cert", "client_cert", "client_key", "csr"):
+                print(_format_certificate_status_line(key, status[key]))
             return 0
         if args.command == "clean":
             removed = clean_agent_certificate(cfg)
@@ -245,6 +302,16 @@ def cert_main(argv: Sequence[str]) -> int:
         print(colorize(f"Certificate management failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
     return 1
+
+
+def _format_certificate_status_line(name: str, value: str) -> str:
+    state = value.split(":", 1)[0]
+    color = {
+        "present": Ansi.GREEN,
+        "missing": Ansi.RED,
+        "expired": Ansi.YELLOW,
+    }.get(state)
+    return f"{name}: {colorize(value, color)}"
 
 
 def format_result(result: ActionResult) -> str:
