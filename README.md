@@ -240,30 +240,15 @@ For environments where you want a simple `/usr/bin/geppetto-auto`, ship the `scr
 
 ### RPM packaging
 
-Current workflow (no helper scripts):
+To build directly from the checked-out source tree, use RPM's build-in-place mode:
 
-1. Build a source tarball:
+```bash
+rpmbuild -bb --build-in-place geppetto-automation.spec
+```
 
-   ```bash
-   python3 -m pip install --upgrade build  # once per machine
-   python3 -m build --sdist
-   ```
+The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). The `build.sh` helper runs the same command, and `./build.sh --install` installs the built package with `rpm -Uvh --force`.
 
-   This produces `dist/geppetto_automation-<version>.tar.gz`.
-
-2. On your RPM build host, place the tarball where `rpmbuild` expects it and rename to match `Source0` in `geppetto_automation.spec` (underscores):
-
-   ```bash
-   cp dist/geppetto_automation-<version>.tar.gz ~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz
-   ```
-
-3. Build the RPM:
-
-   ```bash
-   rpmbuild -bb geppetto_automation.spec
-   ```
-
-The resulting RPM will land under `~/rpmbuild/RPMS/` (or whatever `%_rpmdir` is set to). Adjust version/release inside `geppetto_automation.spec` before building.
+The source-tarball workflow still works for source-RPM style builds: run `python3 -m build --sdist`, copy `dist/geppetto_automation-<version>.tar.gz` to `~/rpmbuild/SOURCES/geppetto_automation-<version>.tar.gz`, then run `rpmbuild -bb geppetto-automation.spec`.
 
 ### Debian/Ubuntu packaging (quick path)
 
