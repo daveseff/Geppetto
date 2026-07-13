@@ -11,7 +11,6 @@ import pytest
 from geppetto_automation.config import DEFAULT_PLAN, GeppettoConfig
 from geppetto_automation.config_service import (
     _build_https_opener,
-    _cert_path_state,
     _ensure_mtls_material,
     agent_certificate_status,
     clean_agent_certificate,
@@ -243,38 +242,14 @@ def test_agent_certificate_status_and_clean_use_default_paths(
     monkeypatch.setattr("geppetto_automation.config_service.DEFAULT_PKI_DIR", default_pki)
     cfg = GeppettoConfig(config_service_host="host1")
     default_pki.mkdir()
-    for name in ("ca.crt", "host1.crt", "host1.key", "host1.csr"):
+    for name in ("host1.crt", "host1.key", "host1.csr"):
         (default_pki / name).write_text(name)
 
     status = agent_certificate_status(cfg)
     removed = clean_agent_certificate(cfg)
 
     assert status["client_cert"] == f"present:{default_pki / 'host1.crt'}"
-    assert removed == [
-        default_pki / "host1.csr",
-        default_pki / "host1.crt",
-        default_pki / "host1.key",
-        default_pki / "ca.crt",
-    ]
-
-
-def test_cert_path_state_reports_expired_certificate(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    cert = tmp_path / "expired.crt"
-    cert.write_text("placeholder")
-
-    class FakeCompleted:
-        returncode = 0
-        stdout = "notAfter=Jan  1 00:00:00 2000 GMT\n"
-
-    monkeypatch.setattr(
-        "geppetto_automation.config_service.subprocess.run",
-        lambda *args, **kwargs: FakeCompleted(),
-    )
-
-    assert _cert_path_state(cert) == f"expired:{cert}"
+    assert removed == [default_pki / "host1.csr", default_pki / "host1.crt", default_pki / "host1.key"]
 
 
 def test_resolve_plan_path_uses_service_bundle_by_default(tmp_path: Path) -> None:

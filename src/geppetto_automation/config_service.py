@@ -9,7 +9,6 @@ import ssl
 import socket
 import subprocess
 import tempfile
-import time
 import zipfile
 from pathlib import Path
 from urllib import error, request
@@ -69,8 +68,8 @@ def agent_certificate_status(cfg) -> dict[str, str]:
     csr_path = client_cert.with_suffix(".csr")
     return {
         "host": host_name,
-        "ca_cert": _cert_path_state(ca_cert),
-        "client_cert": _cert_path_state(client_cert),
+        "ca_cert": _path_state(ca_cert),
+        "client_cert": _path_state(client_cert),
         "client_key": _path_state(client_key),
         "csr": _path_state(csr_path),
     }
@@ -80,7 +79,7 @@ def clean_agent_certificate(cfg) -> list[Path]:
     host_name = resolve_config_service_host(cfg)
     ca_cert, client_cert, client_key = _resolve_mtls_paths(cfg, host_name)
     removed: list[Path] = []
-    for path in (client_cert.with_suffix(".csr"), client_cert, client_key, ca_cert):
+    for path in (client_cert.with_suffix(".csr"), client_cert, client_key):
         if path.exists():
             path.unlink()
             removed.append(path)
@@ -133,35 +132,6 @@ def _resolve_mtls_paths(cfg, host_name: str) -> tuple[Path, Path, Path]:
 
 def _path_state(path: Path) -> str:
     return f"present:{path}" if path.exists() else f"missing:{path}"
-
-
-def _cert_path_state(path: Path) -> str:
-    if not path.exists():
-        return f"missing:{path}"
-    if _certificate_expired(path):
-        return f"expired:{path}"
-    return f"present:{path}"
-
-
-def _certificate_expired(path: Path) -> bool:
-    try:
-        result = subprocess.run(
-            ["openssl", "x509", "-enddate", "-noout", "-in", str(path)],
-            capture_output=True,
-            text=True,
-        )
-    except OSError:
-        return False
-    if result.returncode != 0:
-        return False
-    prefix = "notAfter="
-    enddate = result.stdout.strip()
-    if not enddate.startswith(prefix):
-        return False
-    try:
-        return ssl.cert_time_to_seconds(enddate.removeprefix(prefix)) <= time.time()
-    except ValueError:
-        return False
 
 
 def _fetch_ca_cert(service_url: str, ca_cert: Path) -> None:
