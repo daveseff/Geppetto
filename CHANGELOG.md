@@ -8,6 +8,41 @@ point the changelog was introduced.
 ## 0.2.0
 
 ### Added
+- REST-backed config synchronization via `config_service_url` and
+  `config_service_path`. Agents can download host-specific config bundles before
+  loading the plan.
+- mTLS support for the REST config service, including CA trust, client
+  certificate, and client key configuration.
+- Puppet-style agent certificate enrollment:
+  - fetch the server CA into `/etc/geppetto/pki/ca.crt` by default
+  - generate `/etc/geppetto/pki/<hostname>.key`
+  - generate and submit `/etc/geppetto/pki/<hostname>.csr`
+  - download the signed client certificate after server approval
+- Agent certificate CLI commands:
+  - `geppetto-auto cert init`
+  - `geppetto-auto cert status`
+  - `geppetto-auto cert clean`
+- `config_service_host` to override the hostname used for bundle selection and
+  certificate enrollment.
+- Default REST/mTLS PKI paths under `/etc/geppetto/pki` when explicit
+  certificate paths are omitted.
+- Root-level Arch Linux packaging under `packaging/`, allowing `makepkg -si`
+  directly from `Geppetto/packaging`.
+
+### Changed
+- Bumped the agent package version to `0.2.0`.
+- Documented REST config service enrollment and root-level packaging in the
+  README and sample config.
+- Config source validation now rejects simultaneous use of Git-backed config
+  sync and REST-backed config service sync.
+
+### Fixed
+- Missing CA/client certificate files now trigger certificate bootstrap instead
+  of a raw `FileNotFoundError` from TLS context creation.
+
+## 0.1.3
+
+### Fixed
 - `remote_file` supports `verify_tls` for HTTPS sources; set `verify_tls = false` to allow self-signed certificates.
 
 ## 0.1.2
