@@ -10,6 +10,7 @@ BuildArch:      noarch
 
 BuildRequires:  python3-devel
 BuildRequires:  python3-rpm-macros
+BuildRequires:  pyproject-rpm-macros
 BuildRequires:  python3dist(hatchling)
 BuildRequires:  python3dist(tomli)
 Requires:       python3 >= 3.9

@@ -1,13 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-VER="${1}"
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
-if [ -z "${VER}" ]; then
-  echo "Usage: ./build.sh <version> "
-  exit 1
+rpmbuild -bb --build-in-place geppetto-automation.spec
+
+if [[ "${1:-}" == "--install" ]]; then
+  rpm -Uvh --force ~/rpmbuild/RPMS/noarch/geppetto_automation-*.noarch.rpm
 fi
-
-rsync -avP dist/geppetto_automation-${VER}.tar.gz ~/rpmbuild/SOURCES
-rsync -avP geppetto-automation.spec ~/rpmbuild/SPECS/
-rpmbuild -bb ~/rpmbuild/SPECS/geppetto-automation.spec && rpm -Uvh --force ~/rpmbuild/RPMS/noarch/geppetto_automation-${VER}-1.amzn2023.noarch.rpm
-
