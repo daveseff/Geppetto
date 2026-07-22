@@ -188,24 +188,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for result in results:
         _clear_progress()
         summary.add(result)
-        logger = logging.getLogger("geppetto")
-        if result.failed:
-            logger.error(
-                "host=%s action=%s resource=%s failed details=%s",
-                result.host,
-                result.action,
-                result.resource,
-                result.details,
-            )
-        else:
-            logger.info(
-                "host=%s action=%s resource=%s changed=%s details=%s",
-                result.host,
-                result.action,
-                result.resource,
-                result.changed,
-                result.details,
-            )
+        log_result(result)
         if not should_display_result(result, effective_level):
             continue
         print(format_result(result))
@@ -266,6 +249,37 @@ def format_result(result: ActionResult) -> str:
     resource = f"[{result.resource}]" if result.resource else ""
     line = f"{result.host}::{result.action}{resource} {status} - {result.details}"
     return colorize(line, color)
+
+
+def log_result(result: ActionResult) -> None:
+    logger = logging.getLogger("geppetto")
+    if result.failed:
+        logger.error(
+            "host=%s action=%s resource=%s failed details=%s",
+            result.host,
+            result.action,
+            result.resource,
+            result.details,
+        )
+        return
+    if result.changed:
+        logger.info(
+            "host=%s action=%s resource=%s changed=%s details=%s",
+            result.host,
+            result.action,
+            result.resource,
+            result.changed,
+            result.details,
+        )
+        return
+    logger.debug(
+        "host=%s action=%s resource=%s changed=%s details=%s",
+        result.host,
+        result.action,
+        result.resource,
+        result.changed,
+        result.details,
+    )
 
 
 def should_display_result(result: ActionResult, log_level: int) -> bool:

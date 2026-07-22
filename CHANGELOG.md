@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.2.1
+
+### Fixed
+- Suppressed `INFO geppetto - ... changed=False details=noop` lines for
+  unchanged operations at the default log level. Noop results now log at
+  `DEBUG`, while changed results remain at `INFO` and failures remain at
+  `ERROR`.
+
 ## 0.2.0
 
 ### Added
