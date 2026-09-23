@@ -12,3 +12,4 @@ build.sh
 *.tar.gz
 *.zst
 examples/packaging
+.package*

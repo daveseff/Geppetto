@@ -1,5 +1,5 @@
 Name:           geppetto_automation
-Version:        0.2.1
+Version:        0.2.2
 Release:        1%{?dist}
 Summary:        Geppetto automation tools
 
@@ -25,6 +25,9 @@ Lightweight systems automation toolkit for Geppetto.
 %autosetup -n %{name}-%{version}
 
 %build
+# In-place builds retain wheels from earlier versions. Remove our old wheels
+# before building, since the install macro consumes every wheel in this directory.
+rm -f "%{_pyproject_wheeldir}"/geppetto_automation-*.whl
 %pyproject_wheel
 
 %install

@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from typing import Iterable, Optional
 import logging
 import shutil
+import subprocess
 
 from .base import Operation
-from ..executors import Executor
+from ..executors import CommandResult, Executor
 from ..types import ActionResult, HostConfig
 
 logger = logging.getLogger(__name__)
@@ -25,8 +26,8 @@ class PackageOperation(Operation):
         if not self.packages:
             raise ValueError("package operation requires at least one package")
         self.state = str(spec.get("state", "present"))
-        if self.state not in {"present", "absent"}:
-            raise ValueError("package operation state must be 'present' or 'absent'")
+        if self.state not in {"present", "absent", "latest"}:
+            raise ValueError("package operation state must be 'present', 'absent', or 'latest'")
         self.preferred_manager = spec.get("manager")
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
@@ -36,6 +37,8 @@ class PackageOperation(Operation):
         )
         if self.state == "present":
             changed, details = manager.ensure_present(executor, self.packages)
+        elif self.state == "latest":
+            changed, details = manager.ensure_latest(executor, self.packages)
         else:
             changed, details = manager.ensure_absent(executor, self.packages)
         detail_msg = f"manager={manager.name} {details}" if details else f"manager={manager.name}"
@@ -75,6 +78,43 @@ class PackageManager:
         self.install(executor, needed)
         return True, f"installed={','.join(needed)}"
 
+    def ensure_latest(self, executor: Executor, packages: Iterable[str]) -> tuple[bool, str]:
+        installed: list[str] = []
+        upgraded: list[str] = []
+        for package in dict.fromkeys(packages):
+            if not self.is_installed(executor, package):
+                self.install(executor, [package])
+                installed.append(package)
+            elif self.has_update(executor, package):
+                before = self.installed_version(executor, package)
+                self.upgrade(executor, [package])
+                if executor.dry_run or self.installed_version(executor, package) != before:
+                    upgraded.append(package)
+        details = []
+        if installed:
+            details.append(f"installed={','.join(installed)}")
+        if upgraded:
+            details.append(f"upgraded={','.join(upgraded)}")
+        return bool(details), " ".join(details) or "already-latest"
+
+    def has_update(self, executor: Executor, package: str) -> bool:
+        raise NotImplementedError
+
+    def installed_version(self, executor: Executor, package: str) -> str:
+        raise NotImplementedError
+
+    def upgrade(self, executor: Executor, packages: list[str]) -> None:
+        self.install(executor, packages)
+
+    @staticmethod
+    def _query(executor: Executor, command: list[str], allowed: tuple[int, ...] = (0,)) -> CommandResult:
+        result = executor.run(command, check=False, mutable=False, env={"LC_ALL": "C"})
+        if result.returncode not in allowed:
+            raise subprocess.CalledProcessError(
+                result.returncode, command, result.stdout, result.stderr
+            )
+        return result
+
     def ensure_absent(self, executor: Executor, packages: Iterable[str]) -> tuple[bool, str]:
         removable = [pkg for pkg in packages if self.is_installed(executor, pkg)]
         if not removable:
@@ -108,6 +148,16 @@ class DpkgQuery:
 class AptPackageManager(PackageManager):
     name = "apt"
 
+    def has_update(self, executor: Executor, package: str) -> bool:
+        result = self._query(executor, ["apt-get", "--simulate", "install", package])
+        return any(
+            line.startswith("Inst ") and line.split()[1].split(":")[0] == package.split(":")[0]
+            for line in result.stdout.splitlines()
+        )
+
+    def installed_version(self, executor: Executor, package: str) -> str:
+        return self._query(executor, ["dpkg-query", "-W", "-f", "${Version}", package]).stdout.strip()
+
     def __init__(self) -> None:
         self.query = DpkgQuery()
 
@@ -123,6 +173,20 @@ class AptPackageManager(PackageManager):
 
 class DnfPackageManager(PackageManager):
     name = "dnf"
+
+    def has_update(self, executor: Executor, package: str) -> bool:
+        result = self._query(executor, [self.name, "check-update", package], (0, 100))
+        return result.returncode == 100
+
+    def installed_version(self, executor: Executor, package: str) -> str:
+        result = self._query(
+            executor,
+            ["rpm", "-q", "--qf", "%{NAME} %{ARCH} %{EPOCHNUM}:%{VERSION}-%{RELEASE}\n", package],
+        )
+        return "\n".join(sorted(result.stdout.splitlines()))
+
+    def upgrade(self, executor: Executor, packages: list[str]) -> None:
+        executor.run([self.name, "upgrade", "-y", *packages])
 
     def install(self, executor: Executor, packages: list[str]) -> None:
         executor.run(["dnf", "install", "-y", *packages])
@@ -148,6 +212,21 @@ class YumPackageManager(DnfPackageManager):
 class BrewPackageManager(PackageManager):
     name = "brew"
 
+    def has_update(self, executor: Executor, package: str) -> bool:
+        # Homebrew returns 1 when an explicitly named package is outdated.
+        result = self._query(executor, ["brew", "outdated", "--quiet", package], (0, 1))
+        if result.returncode == 1 and not result.stdout.strip():
+            raise subprocess.CalledProcessError(
+                result.returncode, result.command, result.stdout, result.stderr
+            )
+        return bool(result.stdout.strip())
+
+    def installed_version(self, executor: Executor, package: str) -> str:
+        return self._query(executor, ["brew", "list", "--versions", package]).stdout.strip()
+
+    def upgrade(self, executor: Executor, packages: list[str]) -> None:
+        executor.run(["brew", "upgrade", *packages])
+
     def install(self, executor: Executor, packages: list[str]) -> None:
         executor.run(["brew", "install", *packages])
 
@@ -161,6 +240,17 @@ class BrewPackageManager(PackageManager):
 
 class PacmanPackageManager(PackageManager):
     name = "pacman"
+
+    def has_update(self, executor: Executor, package: str) -> bool:
+        result = self._query(executor, ["pacman", "-Qu", package], (0, 1))
+        if result.returncode == 1 and result.stderr.strip():
+            raise subprocess.CalledProcessError(
+                result.returncode, result.command, result.stdout, result.stderr
+            )
+        return bool(result.stdout.strip())
+
+    def installed_version(self, executor: Executor, package: str) -> str:
+        return self._query(executor, ["pacman", "-Q", package]).stdout.strip()
 
     def install(self, executor: Executor, packages: list[str]) -> None:
         executor.run(["pacman", "-S", "--noconfirm", *packages])
