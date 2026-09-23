@@ -160,6 +160,30 @@ mkfs => true
 
 ```
 
+Package resources accept `ensure => present` (install only if missing),
+`ensure => absent` (remove), or `ensure => latest` (install or upgrade):
+
+```
+package { 'splunkforwarder':
+  ensure => latest
+  on_success => {
+    exec { 'after-splunk-upgrade':
+      command => '/usr/local/bin/configure-splunk'
+    }
+  }
+}
+```
+
+`latest` supports apt, dnf, yum, Homebrew, and pacman. Already-current
+packages report no change; successful installs or version changes trigger
+`on_success`. Dry runs check for updates without installing or upgrading.
+Versions follow the configured repositories and package-manager policies.
+Geppetto does not explicitly refresh repository metadata: apt and pacman use
+their existing indexes, while dnf, yum, and Homebrew follow their normal
+metadata behavior. Manage index refreshes separately; on Arch, maintain the
+normal full-system upgrade workflow rather than refreshing indexes solely for
+a partial package upgrade.
+
 Conditional follow-up actions:
 
 ```

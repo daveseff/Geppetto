@@ -1,7 +1,7 @@
 # Maintainer: Geppetto Maintainers <noreply@example.invalid>
 
 pkgname=geppetto_automation
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc="Lightweight automation toolkit for declarative host config"
 arch=('any')

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.2.2
+
+### Fixed
+- Remove stale Geppetto wheels before RPM builds so repeated in-place builds
+  do not try to install multiple package versions together.
+
+### Added
+- Package resources support `ensure => latest` to install missing packages or
+  upgrade installed packages using apt, dnf, yum, Homebrew, or pacman.
+- Latest-package checks support dry runs and only report actual version changes
+  during normal runs, so `on_success` actions run after installs or upgrades.
+
+### Changed
+- Bumped Python, RPM, and Arch package versions to `0.2.2`.
+- Documented package states and repository metadata behavior.
+
 ## 0.2.1
 
 ### Fixed
