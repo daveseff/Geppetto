@@ -69,6 +69,14 @@ def test_map_literal_in_dsl() -> None:
     assert plan.hosts["local"].variables["secret"]["aws_secret"] == "name"
 
 
+def test_node_groups_accept_equals_assignment() -> None:
+    plan = DSLParser().parse_text(
+        "node 'host1' { groups = ['group1', 'group2'] }"
+    )
+
+    assert plan.hosts["host1"].variables["groups"] == ["group1", "group2"]
+
+
 def test_number_literal_in_dsl() -> None:
     parser = DSLParser()
     sample = """

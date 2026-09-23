@@ -1,4 +1,4 @@
-task 'host1-users' on ['host1'] {
+task 'baseline-users' on ['*'] {
   user { 'geppetto':
     shell    => '/bin/bash'
     locked   => true

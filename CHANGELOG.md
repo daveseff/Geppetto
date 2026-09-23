@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.0
+
+### Added
+- Server-delivered plans now combine the always-published `defaults/` tasks,
+  tasks from every group named by the requesting host's `groups` node
+  attribute, and that host's own plan files.
+- Node attributes accept either `=>` or `=`, including declarations such as
+  `groups = ['staging', 'database']`.
+- REST-backed agents understand the `'*'` task target for defaults that apply
+  to every host.
+
+### Changed
+- REST-backed agents execute only tasks whose `on` list contains their own
+  hostname. This permits group-wide tasks such as `on ['host2', 'host3']` and
+  one-off exceptions such as `on ['host3']` without attempting to manage the
+  other hosts remotely.
+- The generated REST bundle entrypoint is now `config/plan.fops`.
+- Bumped Python, RPM, and Arch package versions to `0.3.0`.
+
 ## 0.2.2
 
 ### Fixed

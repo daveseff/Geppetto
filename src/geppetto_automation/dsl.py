@@ -33,6 +33,7 @@ class Tokenizer:
         "]": "RBRACKET",
         ",": "COMMA",
         ":": "COLON",
+        "=": "EQUAL",
     }
 
     def __init__(self, text: str):
@@ -284,7 +285,8 @@ class DSLParser:
         attrs: dict[str, object] = {}
         while not self._check("RBRACE"):
             key_token = self._consume("IDENT")
-            self._consume("ARROW")
+            if not self._match("ARROW"):
+                self._consume("EQUAL")
             if key_token.value in {"on_success", "on_failure"} and self._check("LBRACE"):
                 attrs[key_token.value] = self._parse_action_block_list()
             else:

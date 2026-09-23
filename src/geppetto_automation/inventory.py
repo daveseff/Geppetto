@@ -139,21 +139,33 @@ class InventoryLoader:
             for action in task.actions:
                 _assign(action)
 
-    def _read_with_includes(self, path: Path, seen: Optional[set[Path]] = None) -> str:
-        seen = seen or set()
+    def _read_with_includes(
+        self,
+        path: Path,
+        seen: Optional[set[Path]] = None,
+        active: Optional[set[Path]] = None,
+    ) -> str:
+        seen = seen if seen is not None else set()
+        active = active if active is not None else set()
         real = path.resolve()
-        if real in seen:
+        if real in active:
             raise ValueError(f"Recursive include detected for {path}")
+        if real in seen:
+            return ""
         seen.add(real)
+        active.add(real)
         lines: list[str] = []
-        for line in path.read_text().splitlines():
-            stripped = line.strip()
-            match = self.INCLUDE_RE.match(stripped)
-            if match:
-                include_path = (path.parent / match.group(1)).resolve()
-                lines.append(self._read_with_includes(include_path, seen))
-            else:
-                lines.append(line)
+        try:
+            for line in path.read_text().splitlines():
+                stripped = line.strip()
+                match = self.INCLUDE_RE.match(stripped)
+                if match:
+                    include_path = (path.parent / match.group(1)).resolve()
+                    lines.append(self._read_with_includes(include_path, seen, active))
+                else:
+                    lines.append(line)
+        finally:
+            active.remove(real)
         return "\n".join(lines)
 
     @staticmethod

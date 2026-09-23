@@ -23,7 +23,7 @@ from .dsl import DSLParseError
 from .inventory import InventoryLoader
 from .runner import TaskRunner
 from .state import StateStore
-from .types import ActionResult
+from .types import ActionResult, HostConfig, Plan
 from .operations import OPERATION_REGISTRY
 
 
@@ -161,6 +161,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         _clear_progress()
         print(colorize(f"Plan validation failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
+    if _uses_default_service_plan(args.plan, cfg):
+        plan = _scope_plan_to_host(plan, resolve_config_service_host(cfg))
 
     state_path = args.state_file or cfg.state_file
     if not state_path:
@@ -424,9 +426,26 @@ def _resolve_plan_path(cli_plan: Optional[Path], cfg) -> Path:
         return cli_plan
     service_path = getattr(cfg, "config_service_path", None)
     if service_path and cfg.plan == DEFAULT_PLAN:
-        host_name = resolve_config_service_host(cfg)
-        return Path(service_path) / "hosts" / host_name / "plan.fops"
+        return Path(service_path) / "plan.fops"
     return cfg.plan
+
+
+def _uses_default_service_plan(cli_plan: Optional[Path], cfg) -> bool:
+    return cli_plan is None and bool(getattr(cfg, "config_service_path", None)) and cfg.plan == DEFAULT_PLAN
+
+
+def _scope_plan_to_host(plan: Plan, host_name: str) -> Plan:
+    """Limit a server-delivered plan to work assigned to this agent."""
+    host = plan.hosts.get(host_name)
+    if host is None:
+        host = HostConfig(name=host_name)
+    tasks = []
+    for task in plan.tasks:
+        if host_name not in task.hosts and "*" not in task.hosts:
+            continue
+        task.hosts = [host_name]
+        tasks.append(task)
+    return Plan(hosts={host_name: host}, tasks=tasks)
 
 
 def _validate_config_sources(cfg) -> None:

@@ -1,4 +1,4 @@
-task 'host1-packages' on ['host1'] {
+task 'baseline-packages' on ['*'] {
   package { [
       'awscli',
       'jq',

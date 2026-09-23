@@ -17,7 +17,8 @@ from geppetto_automation.config_service import (
     resolve_config_service_host,
     sync_config_service,
 )
-from geppetto_automation.cli import _resolve_plan_path, _validate_config_sources
+from geppetto_automation.cli import _resolve_plan_path, _scope_plan_to_host, _validate_config_sources
+from geppetto_automation.types import ActionSpec, HostConfig, Plan, TaskSpec
 
 
 def _build_bundle(files: dict[str, str]) -> bytes:
@@ -258,7 +259,25 @@ def test_resolve_plan_path_uses_service_bundle_by_default(tmp_path: Path) -> Non
         config_service_path=tmp_path / "config",
         config_service_host="host1",
     )
-    assert _resolve_plan_path(None, cfg) == tmp_path / "config/hosts/host1/plan.fops"
+    assert _resolve_plan_path(None, cfg) == tmp_path / "config/plan.fops"
+
+
+def test_scope_service_plan_runs_only_current_host_and_wildcards() -> None:
+    action = ActionSpec(type="package", data={"name": "demo"})
+    plan = Plan(
+        hosts={"host2": HostConfig("host2"), "host3": HostConfig("host3")},
+        tasks=[
+            TaskSpec("group", ["host2", "host3"], [action]),
+            TaskSpec("one-off", ["host3"], [action]),
+            TaskSpec("defaults", ["*"], [action]),
+        ],
+    )
+
+    scoped = _scope_plan_to_host(plan, "host2")
+
+    assert list(scoped.hosts) == ["host2"]
+    assert [task.name for task in scoped.tasks] == ["group", "defaults"]
+    assert all(task.hosts == ["host2"] for task in scoped.tasks)
 
 
 def test_resolve_plan_path_keeps_explicit_plan(tmp_path: Path) -> None:

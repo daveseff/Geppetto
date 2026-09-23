@@ -36,7 +36,7 @@ def sync_config_service(cfg) -> None:
     bundle_url = f"{str(service_url).rstrip('/')}/v1/configs/{host_name}/bundle"
     headers = {
         "Accept": "application/zip",
-        "User-Agent": "geppetto-auto/0.1",
+        "User-Agent": "geppetto-auto/0.3",
     }
     req = request.Request(bundle_url, headers=headers)
     opener = _build_https_opener(cfg)

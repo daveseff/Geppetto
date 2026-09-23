@@ -105,6 +105,29 @@ def test_dsl_include(tmp_path: Path) -> None:
     assert plan.tasks[0].actions[0].data["name"] == "htop"
 
 
+def test_duplicate_dsl_include_is_loaded_once(tmp_path: Path) -> None:
+    shared = tmp_path / "shared.fops"
+    shared.write_text("task 'shared' on 'local' {}")
+    nested = tmp_path / "nested.fops"
+    nested.write_text("include 'shared.fops'")
+    main = tmp_path / "main.fops"
+    main.write_text("include 'shared.fops'\ninclude 'nested.fops'\n")
+
+    plan = InventoryLoader().load(main)
+
+    assert [task.name for task in plan.tasks] == ["shared"]
+
+
+def test_recursive_dsl_include_is_rejected(tmp_path: Path) -> None:
+    first = tmp_path / "first.fops"
+    second = tmp_path / "second.fops"
+    first.write_text("include 'second.fops'")
+    second.write_text("include 'first.fops'")
+
+    with pytest.raises(ValueError, match="Recursive include"):
+        InventoryLoader().load(first)
+
+
 def test_toml_on_success(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.toml"
     plan_path.write_text(
