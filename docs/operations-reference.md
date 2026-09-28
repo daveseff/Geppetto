@@ -56,11 +56,16 @@ Each DSL resource maps to an operation with specific options. This reference lis
 
 ## cron
 - `name` (string): job identifier. Required.
+- `target` (`cron_d`|`crontab_entry`|`crontab`, default `cron_d`): manage one `/etc/cron.d` job, one user-crontab entry, or a user's complete crontab.
 - `minute` `hour` `day` `month` `weekday` (strings): schedule fields (`*`, ranges, lists).
 - `user` (string): run as user. Required.
-- `command` (string): command line. Required.
+- `command` (string): command line. Required for `target => cron_d` and `target => crontab_entry`.
+- `special` (string): an `@daily`-style schedule for `target => crontab_entry`; replaces the five schedule fields.
+- `content` (string): complete crontab contents. Required for `target => crontab`.
 - `state` (present|absent, default present).
 - `env` (map): environment variables.
+
+With `target => crontab_entry`, the resource manages one exact job in the user's crontab. `geppetto-auto import cron USER` emits one such resource per existing job so jobs can be adopted and removed independently. With `target => crontab`, the resource instead manages the complete crontab atomically; setting that resource absent removes the user's complete crontab.
 
 ## efs_mount
 - `filesystem_id` (string): EFS ID. Required.

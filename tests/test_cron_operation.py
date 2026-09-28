@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from geppetto_automation.executors import LocalExecutor
+from geppetto_automation.executors import CommandResult, LocalExecutor
 from geppetto_automation.operations.cron import CronOperation
 from geppetto_automation.types import HostConfig
 
@@ -40,3 +40,87 @@ def test_cron_absent(tmp_path: Path) -> None:
     result = op.apply(HostConfig("local"), executor)
     assert result.changed is True
     assert not cron_file.exists()
+
+
+class CrontabExecutor(LocalExecutor):
+    def __init__(self, content: str | None):
+        super().__init__(HostConfig(name="local"), dry_run=False)
+        self.content = content
+        self.installed: list[str] = []
+
+    def run(self, command, **kwargs):
+        if command[-1] == "-l":
+            if self.content is None:
+                return CommandResult(list(command), "", "no crontab for alice", 1)
+            return CommandResult(list(command), self.content, "", 0)
+        if command[-1] == "-":
+            self.content = kwargs["input_text"]
+            self.installed.append(self.content)
+        elif command[-1] == "-r":
+            self.content = None
+        return CommandResult(list(command), "", "", 0)
+
+
+def test_imported_crontab_is_adopted_without_change() -> None:
+    content = "MAILTO=''\n0 2 * * * /usr/local/bin/backup\n"
+    executor = CrontabExecutor(content)
+    op = CronOperation(
+        {"name": "alice-crontab", "target": "crontab", "user": "alice", "content": content}
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is False
+    assert result.details == "noop"
+    assert executor.installed == []
+
+
+def test_managed_crontab_is_replaced_as_one_resource() -> None:
+    executor = CrontabExecutor("0 2 * * * /old\n")
+    op = CronOperation(
+        {"name": "alice-crontab", "target": "crontab", "user": "alice", "content": "@daily /new"}
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert executor.installed == ["@daily /new\n"]
+
+
+def test_imported_crontab_entry_is_adopted_without_change() -> None:
+    executor = CrontabExecutor("0 5 * * * /usr/sbin/aide --check\n")
+    op = CronOperation(
+        {
+            "name": "root-aide",
+            "target": "crontab_entry",
+            "user": "root",
+            "minute": "0",
+            "hour": "5",
+            "command": "/usr/sbin/aide --check",
+        }
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is False
+    assert executor.installed == []
+
+
+def test_crontab_entry_absent_removes_only_matching_job() -> None:
+    executor = CrontabExecutor("0 5 * * * /usr/sbin/aide --check\n@daily /bin/backup\n")
+    op = CronOperation(
+        {
+            "name": "root-aide",
+            "target": "crontab_entry",
+            "user": "root",
+            "minute": "0",
+            "hour": "5",
+            "command": "/usr/sbin/aide --check",
+            "state": "absent",
+        }
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert executor.installed == ["@daily /bin/backup\n"]

@@ -21,6 +21,7 @@ from .config_service import (
 )
 from .dsl import DSLParseError
 from .inventory import InventoryLoader
+from .importers import import_crontab
 from .runner import TaskRunner
 from .state import StateStore
 from .types import ActionResult, HostConfig, Plan
@@ -103,6 +104,19 @@ def parse_cert_args(argv: Sequence[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def parse_import_args(argv: Sequence[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="geppetto-auto import",
+        description="Import existing resources into a Geppetto plan",
+    )
+    subparsers = parser.add_subparsers(dest="resource", required=True)
+    cron = subparsers.add_parser("cron", help="Import each job from a user's crontab")
+    cron.add_argument("user", help="User whose crontab should be imported")
+    cron.add_argument("--host", help="Host name override (default: detected hostname)")
+    cron.add_argument("--task-name", help="Name for the generated task")
+    return parser.parse_args(argv)
+
+
 def configure_logging(level: str, *, log_file: Optional[Path]) -> None:
     log_level = getattr(logging, level.upper(), logging.INFO)
     handlers: list[logging.Handler] = []
@@ -133,6 +147,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
     if argv and argv[0] == "cert":
         return cert_main(argv[1:])
+    if argv and argv[0] == "import":
+        return import_main(argv[1:])
     args = parse_args(argv)
     if args.version:
         print(_version_string())
@@ -199,6 +215,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(summary.render())
 
     return 0
+
+
+def import_main(argv: Sequence[str]) -> int:
+    args = parse_import_args(argv)
+    try:
+        if args.resource == "cron":
+            print(import_crontab(args.user, host=args.host, task_name=args.task_name), end="")
+            return 0
+    except (OSError, RuntimeError) as exc:
+        print(colorize(f"Import failed: {exc}", Ansi.RED), file=sys.stderr)
+        return 1
+    return 1
 
 
 def cert_main(argv: Sequence[str]) -> int:

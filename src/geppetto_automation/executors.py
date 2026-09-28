@@ -35,6 +35,7 @@ class Executor:
         env: Optional[dict[str, str]] = None,
         cwd: Optional[Union[str, Path]] = None,
         timeout: Optional[float] = None,
+        input_text: Optional[str] = None,
     ) -> CommandResult:
         """Run ``command`` and optionally skip it during dry-runs."""
 
@@ -55,6 +56,7 @@ class Executor:
             env=exec_env,
             cwd=str(cwd) if cwd is not None else None,
             timeout=timeout,
+            input=input_text,
         )
         if check and proc.returncode != 0:
             raise subprocess.CalledProcessError(
@@ -190,7 +192,17 @@ class LocalExecutor(Executor):
 class AgentExecutor(Executor):
     """Placeholder for a daemon/agent backed executor."""
 
-    def run(self, command: Sequence[str], *, check: bool = True, mutable: bool = True) -> CommandResult:  # type: ignore[override]
+    def run(  # type: ignore[override]
+        self,
+        command: Sequence[str],
+        *,
+        check: bool = True,
+        mutable: bool = True,
+        env: Optional[dict[str, str]] = None,
+        cwd: Optional[Union[str, Path]] = None,
+        timeout: Optional[float] = None,
+        input_text: Optional[str] = None,
+    ) -> CommandResult:
         raise NotImplementedError("AgentExecutor is not implemented yet")
 
     def read_file(self, path: Path) -> Optional[str]:  # type: ignore[override]

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## Unreleased
+
+### Added
+- `geppetto-auto import cron USER` reads an existing user crontab and emits a
+  paste-ready task containing one resource per job. The task uses the detected
+  hostname, with optional `--host` and `--task-name` overrides.
+- Cron resources can manage individual user-crontab jobs with
+  `target => 'crontab_entry'`, allowing imported jobs to be adopted into state
+  and removed independently without rewriting or duplicating them.
+
 ## 0.3.0
 
 ### Added

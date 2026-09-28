@@ -20,6 +20,7 @@ A lightweight Python automation toolkit that covers both "server/agent" and "ser
 - First-class operations for package installation/removal and file management.
 - New `exec` resource to mirror Puppet's `exec` (guards, `creates`, env, cwd, allowed return codes).
 - Built-in dry-run flag so you can validate idempotent behavior before touching a node.
+- Resource import can inspect an existing user crontab and emit ready-to-paste DSL.
 - File templates support both `$var` substitution and Jinja (`{{ }}` / `{% %}`) for loops and conditionals, including values pulled from AWS Secrets Manager.
 - Optional plugins so you can ship new operations without forking core.
 
@@ -103,6 +104,18 @@ allowed_hosts:
   - {{ host }}
 {% endfor %}
 ```
+
+### Importing an existing crontab
+
+Generate a task from a user's current crontab:
+
+```sh
+geppetto-auto import cron alice
+```
+
+The command only reads the host and writes DSL to standard output. It emits one independently managed `cron` resource per job, including standard schedules and `@daily`-style entries. Environment assignments active before a job are included in that resource. Paste the task into the plan and run Geppetto normally. Because each generated entry matches a job already installed, the first run is a no-op and records the resources in Geppetto's state instead of creating duplicates.
+
+The emitted task uses the machine's detected hostname. Use `--host HOST` only to override that node name, or `--task-name NAME` to override the generated task name. Import currently operates on the local machine.
 
 Secrets can be injected at render time by pointing variables at AWS Secrets Manager:
 
