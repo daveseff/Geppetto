@@ -3,37 +3,69 @@ from __future__ import annotations
 import re
 import socket
 import subprocess
+import pwd
 from pathlib import PurePath
 from typing import Optional
 
 
 def import_crontab(user: str, *, host: Optional[str] = None, task_name: Optional[str] = None) -> str:
     """Read a user's crontab and render an adoptable Geppetto task."""
-    result = subprocess.run(
-        ["crontab", "-u", user, "-l"],
-        capture_output=True,
-        text=True,
-        check=False,
+    content = _read_crontab(user)
+    if content is None:
+        raise RuntimeError(f"no crontab found for {user}")
+    return _render_crontabs(
+        {user: content},
+        host=host,
+        task_name=task_name or f"imported-crontab-{user}",
     )
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "no crontab found"
-        raise RuntimeError(f"unable to read crontab for {user}: {detail}")
 
-    jobs = _parse_crontab(result.stdout)
-    if not jobs:
-        raise RuntimeError(f"no cron jobs found for {user}")
 
+def import_all_crontabs(*, host: Optional[str] = None, task_name: Optional[str] = None) -> str:
+    """Render every user crontab visible to the current process as one task."""
+    crontabs: dict[str, str] = {}
+    for account in pwd.getpwall():
+        content = _read_crontab(account.pw_name)
+        if content is not None and _parse_crontab(content):
+            crontabs[account.pw_name] = content
+    if not crontabs:
+        raise RuntimeError("no user crontabs found")
+    return _render_crontabs(
+        crontabs,
+        host=host,
+        task_name=task_name or "imported-crontabs",
+    )
+
+
+def _read_crontab(user: str) -> Optional[str]:
+    result = subprocess.run(
+        ["crontab", "-u", user, "-l"], capture_output=True, text=True, check=False
+    )
+    if result.returncode == 0:
+        return result.stdout
+    detail = result.stderr.strip() or result.stdout.strip() or "unable to read crontab"
+    if "no crontab" in detail.lower():
+        return None
+    raise RuntimeError(f"unable to read crontab for {user}: {detail}")
+
+
+def _render_crontabs(
+    crontabs: dict[str, str], *, host: Optional[str], task_name: str
+) -> str:
     host = host or socket.gethostname()
-    name = task_name or f"imported-crontab-{user}"
-    output = [f"task {_dsl_quote(name)} on [{_dsl_quote(host)}] {{"]
+    output = [f"task {_dsl_quote(task_name)} on [{_dsl_quote(host)}] {{"]
     used_names: dict[str, int] = {}
-    for job in jobs:
-        base_name = f"{user}-{_command_name(job['command'])}"
-        used_names[base_name] = used_names.get(base_name, 0) + 1
-        resource_name = base_name
-        if used_names[base_name] > 1:
-            resource_name += f"-{used_names[base_name]}"
-        output.extend(_render_job(resource_name, user, job))
+
+    for user, content in crontabs.items():
+        jobs = _parse_crontab(content)
+        if not jobs:
+            raise RuntimeError(f"no cron jobs found for {user}")
+        for job in jobs:
+            base_name = f"{user}-{_command_name(job['command'])}"
+            used_names[base_name] = used_names.get(base_name, 0) + 1
+            resource_name = base_name
+            if used_names[base_name] > 1:
+                resource_name += f"-{used_names[base_name]}"
+            output.extend(_render_job(resource_name, user, job))
     output.append("}")
     return "\n".join(output) + "\n"
 

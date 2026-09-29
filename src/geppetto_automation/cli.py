@@ -21,7 +21,7 @@ from .config_service import (
 )
 from .dsl import DSLParseError
 from .inventory import InventoryLoader
-from .importers import import_crontab
+from .importers import import_all_crontabs, import_crontab
 from .runner import TaskRunner
 from .state import StateStore
 from .types import ActionResult, HostConfig, Plan
@@ -111,7 +111,13 @@ def parse_import_args(argv: Sequence[str]) -> argparse.Namespace:
     )
     subparsers = parser.add_subparsers(dest="resource", required=True)
     cron = subparsers.add_parser("cron", help="Import each job from a user's crontab")
-    cron.add_argument("user", help="User whose crontab should be imported")
+    selection = cron.add_mutually_exclusive_group(required=True)
+    selection.add_argument("user", nargs="?", help="User whose crontab should be imported")
+    selection.add_argument(
+        "--all-users",
+        action="store_true",
+        help="Import crontabs for every local user that has cron jobs",
+    )
     cron.add_argument("--host", help="Host name override (default: detected hostname)")
     cron.add_argument("--task-name", help="Name for the generated task")
     return parser.parse_args(argv)
@@ -221,7 +227,11 @@ def import_main(argv: Sequence[str]) -> int:
     args = parse_import_args(argv)
     try:
         if args.resource == "cron":
-            print(import_crontab(args.user, host=args.host, task_name=args.task_name), end="")
+            if args.all_users:
+                rendered = import_all_crontabs(host=args.host, task_name=args.task_name)
+            else:
+                rendered = import_crontab(args.user, host=args.host, task_name=args.task_name)
+            print(rendered, end="")
             return 0
     except (OSError, RuntimeError) as exc:
         print(colorize(f"Import failed: {exc}", Ansi.RED), file=sys.stderr)

@@ -61,3 +61,16 @@ def test_main_routes_import_without_loading_config(monkeypatch, capsys):
 
     assert result == 0
     assert capsys.readouterr().out == "alice:web-1:jobs\n"
+
+
+def test_main_routes_all_user_crontab_import(monkeypatch, capsys):
+    monkeypatch.setattr(
+        cli,
+        "import_all_crontabs",
+        lambda host, task_name: f"all:{host}:{task_name}\n",
+    )
+
+    result = cli.main(["import", "cron", "--all-users"])
+
+    assert result == 0
+    assert capsys.readouterr().out == "all:None:None\n"

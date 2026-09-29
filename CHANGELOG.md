@@ -11,6 +11,8 @@ point the changelog was introduced.
 - `geppetto-auto import cron USER` reads an existing user crontab and emits a
   paste-ready task containing one resource per job. The task uses the detected
   hostname, with optional `--host` and `--task-name` overrides.
+- `geppetto-auto import cron --all-users` emits one task containing the cron
+  jobs of every readable local user, while skipping accounts without jobs.
 - Cron resources can manage individual user-crontab jobs with
   `target => 'crontab_entry'`, allowing imported jobs to be adopted into state
   and removed independently without rewriting or duplicating them.

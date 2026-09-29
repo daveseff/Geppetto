@@ -117,6 +117,14 @@ The command only reads the host and writes DSL to standard output. It emits one 
 
 The emitted task uses the machine's detected hostname. Use `--host HOST` only to override that node name, or `--task-name NAME` to override the generated task name. Import currently operates on the local machine.
 
+To import every local user's crontab in one task, run as an account permitted to read them (normally root):
+
+```sh
+geppetto-auto import cron --all-users
+```
+
+Accounts without cron jobs are skipped. Any other read error stops the import rather than silently producing an incomplete plan.
+
 Secrets can be injected at render time by pointing variables at AWS Secrets Manager:
 
 ```

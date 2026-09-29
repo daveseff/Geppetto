@@ -1,9 +1,10 @@
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
 from geppetto_automation.dsl import DSLParser
-from geppetto_automation.importers import import_crontab
+from geppetto_automation.importers import import_all_crontabs, import_crontab
 
 
 def test_import_crontab_renders_one_resource_per_job(monkeypatch) -> None:
@@ -59,5 +60,40 @@ def test_import_crontab_reports_read_failure(monkeypatch) -> None:
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 1, "", "no crontab for missing"),
     )
 
-    with pytest.raises(RuntimeError, match="no crontab for missing"):
+    with pytest.raises(RuntimeError, match="no crontab found for missing"):
         import_crontab("missing")
+
+
+def test_import_all_crontabs_skips_users_without_jobs(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "geppetto_automation.importers.pwd.getpwall",
+        lambda: [SimpleNamespace(pw_name="root"), SimpleNamespace(pw_name="nobody")],
+    )
+
+    def fake_run(command, **kwargs):
+        if command[2] == "root":
+            return subprocess.CompletedProcess(command, 0, "0 5 * * * /usr/sbin/aide --check\n", "")
+        return subprocess.CompletedProcess(command, 1, "", "no crontab for nobody")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    plan = DSLParser().parse_text(import_all_crontabs(host="server-1"))
+
+    assert plan.tasks[0].name == "imported-crontabs"
+    assert len(plan.tasks[0].actions) == 1
+    assert plan.tasks[0].actions[0].data["user"] == "root"
+
+
+def test_import_all_crontabs_fails_on_unexpected_read_error(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "geppetto_automation.importers.pwd.getpwall",
+        lambda: [SimpleNamespace(pw_name="alice")],
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 1, "", "permission denied"),
+    )
+
+    with pytest.raises(RuntimeError, match="permission denied"):
+        import_all_crontabs()
