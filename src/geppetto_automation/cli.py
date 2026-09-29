@@ -184,7 +184,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not state_path:
         state_path = plan_path.with_name(plan_path.name + ".state.json")
 
-    state_store = None if args.dry_run else StateStore(state_path)
+    state_store = StateStore(state_path)
 
     runner = TaskRunner(
         plan,

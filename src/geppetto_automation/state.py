@@ -68,7 +68,7 @@ class StateStore:
         }
         self.current.setdefault(host, {})[key] = entry
 
-    def finalize(self, plan, executor_factory) -> list[ActionResult]:
+    def finalize(self, plan, executor_factory, *, persist: bool = True) -> list[ActionResult]:
         results: list[ActionResult] = []
         for host_name, entries in list(self.previous.items()):
             host = plan.hosts.get(host_name)
@@ -83,7 +83,8 @@ class StateStore:
                 result = self._destroy_entry(host, entry, executor_factory)
                 if result is not None:
                     results.append(result)
-        self._write()
+        if persist:
+            self._write()
         return results
 
     def _destroy_entry(self, host: HostConfig, entry: dict[str, Any], executor_factory) -> Optional[ActionResult]:

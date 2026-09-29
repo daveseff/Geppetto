@@ -18,13 +18,20 @@ class TaskRunner:
         self.dry_run = dry_run
         self.state_store = state_store
         self.progress_callback = progress_callback
+        self._executors: dict[str, Executor] = {}
 
     def run(self) -> list[ActionResult]:
         results: list[ActionResult] = []
         for task in self.plan.tasks:
             results.extend(self._run_task(task))
-        if self.state_store and not self.dry_run:
-            results.extend(self.state_store.finalize(self.plan, self._executor_for))
+        if self.state_store:
+            results.extend(
+                self.state_store.finalize(
+                    self.plan,
+                    self._executor_for,
+                    persist=not self.dry_run,
+                )
+            )
         return results
 
     def _run_task(self, task: TaskSpec) -> list[ActionResult]:
@@ -92,7 +99,7 @@ class TaskRunner:
                 resource=self._resource_name(action.data),
             )
         else:
-            if self.state_store and not self.dry_run:
+            if self.state_store:
                 self.state_store.record(host.name, action)
         logger.debug("action=%s host=%s changed=%s", action.type, host.name, result.changed)
         if result.resource is None:
@@ -122,8 +129,13 @@ class TaskRunner:
             logger.error("action=%s host=%s %s: %s", action.type, host.name, message, exc)
 
     def _executor_for(self, host: HostConfig) -> Executor:
+        existing = self._executors.get(host.name)
+        if existing is not None:
+            return existing
         if host.connection == "local":
-            return LocalExecutor(host, dry_run=self.dry_run)
+            executor = LocalExecutor(host, dry_run=self.dry_run)
+            self._executors[host.name] = executor
+            return executor
         if host.connection == "agent":
             raise NotImplementedError(
                 "Agent connection requested but no AgentExecutor is available yet"

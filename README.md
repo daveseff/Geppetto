@@ -259,7 +259,7 @@ If the loader detects a `.fops` extension (or the DSL syntax), it automatically 
 
 3. Drop the `--dry-run` flag when you are ready to apply changes locally.
 
-The CLI returns zero on success and prints a concise status line per host/action pair. If you provide no path argument the runner defaults to `/etc/geppetto/plan.fops`, and relative template references resolve beneath `/etc/geppetto` (or whatever directory the plan lives in). Each run also maintains a state file (`plan.fops.state.json` by default) so that removing a resource from the plan automatically triggers the appropriate teardown (file removal, user deletion, unmounts, etc.). You can override the state location via `--state-file`.
+The CLI returns zero on success and prints a concise status line per host/action pair. If you provide no path argument the runner defaults to `/etc/geppetto/plan.fops`, and relative template references resolve beneath `/etc/geppetto` (or whatever directory the plan lives in). Each run also maintains a state file (`plan.fops.state.json` by default) so that removing a resource from the plan automatically triggers the appropriate teardown (file removal, user deletion, unmounts, etc.). You can override the state location via `--state-file`. Dry-runs read this state and preview those teardown actions, but never update the state file or the managed resources. Sequential crontab changes are simulated in memory so their dry-run results match apply ordering.
 
 ### Tests
 

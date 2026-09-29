@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
-## Unreleased
+## 0.3.1
 
 ### Added
 - `geppetto-auto import cron USER` reads an existing user crontab and emits a
@@ -14,6 +14,16 @@ point the changelog was introduced.
 - Cron resources can manage individual user-crontab jobs with
   `target => 'crontab_entry'`, allowing imported jobs to be adopted into state
   and removed independently without rewriting or duplicating them.
+
+### Fixed
+- Dry-runs now reconcile the previous state and report resources that apply
+  would remove, without writing the state file or changing those resources.
+- Sequential cron-entry changes are simulated during dry-runs, so later jobs
+  see the crontab content that earlier jobs would have installed.
+
+### Changed
+- Bumped Python, RPM, and Arch package versions to `0.3.1` so import and
+  state-aware dry-run fixes can be upgraded over the `0.3.0` release.
 
 ## 0.3.0
 

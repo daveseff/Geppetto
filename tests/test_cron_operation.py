@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 from geppetto_automation.executors import CommandResult, LocalExecutor
 from geppetto_automation.operations.cron import CronOperation
@@ -124,3 +125,25 @@ def test_crontab_entry_absent_removes_only_matching_job() -> None:
 
     assert result.changed is True
     assert executor.installed == ["@daily /bin/backup\n"]
+
+
+def test_dry_run_crontab_entries_see_prior_planned_writes(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "geppetto_automation.executors.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 1, "", "no crontab for root"
+        ),
+    )
+    executor = LocalExecutor(HostConfig(name="local"), dry_run=True)
+    first = CronOperation(
+        {"name": "first", "target": "crontab_entry", "command": "/bin/first"}
+    )
+    second = CronOperation(
+        {"name": "second", "target": "crontab_entry", "command": "/bin/second"}
+    )
+
+    first_result = first.apply(HostConfig("local"), executor)
+    second_result = second.apply(HostConfig("local"), executor)
+
+    assert first_result.details == "created"
+    assert second_result.details == "updated"

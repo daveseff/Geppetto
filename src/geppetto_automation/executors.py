@@ -88,6 +88,45 @@ class Executor:
 class LocalExecutor(Executor):
     """Executor that acts directly on the local host."""
 
+    def __init__(self, host: HostConfig, *, dry_run: bool = False):
+        super().__init__(host, dry_run=dry_run)
+        self._dry_run_crontabs: dict[str, Optional[str]] = {}
+
+    def run(
+        self,
+        command: Sequence[str],
+        *,
+        check: bool = True,
+        mutable: bool = True,
+        env: Optional[dict[str, str]] = None,
+        cwd: Optional[Union[str, Path]] = None,
+        timeout: Optional[float] = None,
+        input_text: Optional[str] = None,
+    ) -> CommandResult:
+        cmd = list(command)
+        if self.dry_run and len(cmd) == 4 and cmd[:2] == ["crontab", "-u"]:
+            user, action = cmd[2], cmd[3]
+            if action == "-l" and user in self._dry_run_crontabs:
+                content = self._dry_run_crontabs[user]
+                if content is None:
+                    return CommandResult(cmd, "", f"no crontab for {user}", 1)
+                return CommandResult(cmd, content, "", 0)
+            if mutable and action == "-":
+                self._dry_run_crontabs[user] = input_text or ""
+                return CommandResult(cmd, "", "skipped (dry-run)", 0)
+            if mutable and action == "-r":
+                self._dry_run_crontabs[user] = None
+                return CommandResult(cmd, "", "skipped (dry-run)", 0)
+        return super().run(
+            cmd,
+            check=check,
+            mutable=mutable,
+            env=env,
+            cwd=cwd,
+            timeout=timeout,
+            input_text=input_text,
+        )
+
     def read_file(self, path: Path) -> Optional[str]:
         try:
             return path.read_text()

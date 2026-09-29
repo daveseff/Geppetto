@@ -13,3 +13,6 @@ build.sh
 *.zst
 examples/packaging
 .package*
+geppetto_automation-*
+.pyproject-builddir/
+pyproject-wheeldir/
