@@ -105,6 +105,22 @@ def test_dsl_include(tmp_path: Path) -> None:
     assert plan.tasks[0].actions[0].data["name"] == "htop"
 
 
+def test_included_dsl_resource_keeps_its_plan_directory(tmp_path: Path) -> None:
+    host_dir = tmp_path / "hosts/host1"
+    host_dir.mkdir(parents=True)
+    host_plan = host_dir / "plan.fops"
+    host_plan.write_text(
+        "task 'host' on 'host1' { file { '/tmp/demo': template => 'templates/demo.tmpl' } }"
+    )
+    main = tmp_path / "plan.fops"
+    main.write_text("include 'hosts/host1/plan.fops'\n")
+
+    plan = InventoryLoader().load(main)
+
+    action = plan.tasks[0].actions[0]
+    assert action.data["_plan_dir"] == str(host_dir)
+
+
 def test_duplicate_dsl_include_is_loaded_once(tmp_path: Path) -> None:
     shared = tmp_path / "shared.fops"
     shared.write_text("task 'shared' on 'local' {}")

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.3
+
+### Fixed
+- Resources loaded from included plans now retain the directory of the plan
+  that declared them. Relative template paths in defaults, group, and
+  host-specific plans therefore resolve alongside their originating plan
+  instead of relative to the generated bundle entrypoint.
+
+### Changed
+- Bumped Python, RPM, and Arch package versions to `0.3.3`.
+
 ## 0.3.2
 
 ### Fixed

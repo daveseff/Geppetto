@@ -26,8 +26,8 @@ class InventoryLoader:
             if suffix == ".toml":
                 plan = self._load_toml(path)
             elif suffix in {".fops", ".pp"}:
-                text = self._read_with_includes(path)
-                plan = DSLParser().parse_text(text)
+                text, source_dirs = self._read_with_include_origins(path)
+                plan = DSLParser().parse_text(text, source_dirs=source_dirs)
             else:
                 text = path.read_text()
                 try:
@@ -145,28 +145,46 @@ class InventoryLoader:
         seen: Optional[set[Path]] = None,
         active: Optional[set[Path]] = None,
     ) -> str:
-        seen = seen if seen is not None else set()
-        active = active if active is not None else set()
+        lines, _ = self._read_include_lines(
+            path,
+            seen if seen is not None else set(),
+            active if active is not None else set(),
+        )
+        return "\n".join(lines)
+
+    def _read_with_include_origins(self, path: Path) -> tuple[str, dict[int, Path]]:
+        lines, origins = self._read_include_lines(path, set(), set())
+        return "\n".join(lines), {index: origin for index, origin in enumerate(origins, start=1)}
+
+    def _read_include_lines(
+        self,
+        path: Path,
+        seen: set[Path],
+        active: set[Path],
+    ) -> tuple[list[str], list[Path]]:
         real = path.resolve()
         if real in active:
             raise ValueError(f"Recursive include detected for {path}")
         if real in seen:
-            return ""
+            return [], []
         seen.add(real)
         active.add(real)
         lines: list[str] = []
+        origins: list[Path] = []
         try:
             for line in path.read_text().splitlines():
-                stripped = line.strip()
-                match = self.INCLUDE_RE.match(stripped)
+                match = self.INCLUDE_RE.match(line.strip())
                 if match:
                     include_path = (path.parent / match.group(1)).resolve()
-                    lines.append(self._read_with_includes(include_path, seen, active))
+                    child_lines, child_origins = self._read_include_lines(include_path, seen, active)
+                    lines.extend(child_lines)
+                    origins.extend(child_origins)
                 else:
                     lines.append(line)
+                    origins.append(path.parent)
         finally:
             active.remove(real)
-        return "\n".join(lines)
+        return lines, origins
 
     @staticmethod
     def _line_snippet(text: str, line_number: Optional[int]) -> str:

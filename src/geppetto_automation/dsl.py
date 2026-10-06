@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, Mapping, Optional
 
 from .types import ActionSpec, HostConfig, Plan, TaskSpec
 
@@ -158,9 +158,10 @@ class Tokenizer:
 
 
 class DSLParser:
-    def parse_text(self, text: str) -> Plan:
+    def parse_text(self, text: str, *, source_dirs: Optional[Mapping[int, Path]] = None) -> Plan:
         tokenizer = Tokenizer(text)
         self.source_text = text
+        self.source_dirs = source_dirs or {}
         self.tokens: list[Token] = list(tokenizer)
         self.index = 0
         hosts: dict[str, HostConfig] = {}
@@ -225,19 +226,31 @@ class DSLParser:
         if isinstance(title, list):
             if resource_type == "package":
                 data: dict[str, object] = {"packages": [str(item) for item in title]}
-                return [self._build_action(resource_type, data, attrs)]
+                actions = [self._build_action(resource_type, data, attrs)]
+                self._attach_source_dir(actions, type_token.line)
+                return actions
             if resource_type == "file":
                 actions: list[ActionSpec] = []
                 for item in title:
                     data = {"name": str(item), "path": str(item)}
                     actions.append(self._build_action(resource_type, data, attrs))
+                self._attach_source_dir(actions, type_token.line)
                 return actions
             raise DSLParseError("Only package or file resources accept list titles")
 
         data = {"name": str(title)}
         if resource_type == "file":
             data.setdefault("path", data["name"])
-        return [self._build_action(resource_type, data, attrs)]
+        actions = [self._build_action(resource_type, data, attrs)]
+        self._attach_source_dir(actions, type_token.line)
+        return actions
+
+    def _attach_source_dir(self, actions: list[ActionSpec], line: int) -> None:
+        source_dir = self.source_dirs.get(line)
+        if source_dir is None:
+            return
+        for action in actions:
+            action.data.setdefault("_plan_dir", str(source_dir))
 
     def _build_action(self, resource_type: str, data: dict[str, object], attrs: dict[str, object]) -> ActionSpec:
         depends_on: list[str] = []
