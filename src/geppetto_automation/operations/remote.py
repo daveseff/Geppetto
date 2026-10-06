@@ -20,21 +20,25 @@ class RemoteFetcher:
         tmp_fd, tmp_name = tempfile.mkstemp(prefix="geppetto-fetch-")
         os.close(tmp_fd)
         tmp_path = Path(tmp_name)
-        if source.startswith("s3://"):
-            self.executor.run(["aws", "s3", "cp", source, str(tmp_path)], mutable=False)
-        elif source.startswith(("http://", "https://")):
-            command = ["curl", "-fsSL"]
-            if source.startswith("https://") and not verify_tls:
-                command.append("-k")
-            command.extend([source, "-o", str(tmp_path)])
-            self.executor.run(command, mutable=False)
-        elif source.startswith("file://"):
-            shutil.copyfile(Path(source[7:]), tmp_path)
-        else:
-            local = Path(source)
-            if not local.exists():
-                raise FileNotFoundError(f"Source {source} not found")
-            shutil.copyfile(local, tmp_path)
+        try:
+            if source.startswith("s3://"):
+                self.executor.run(["aws", "s3", "cp", source, str(tmp_path)], mutable=False)
+            elif source.startswith(("http://", "https://")):
+                command = ["curl", "-fsSL"]
+                if source.startswith("https://") and not verify_tls:
+                    command.append("-k")
+                command.extend([source, "-o", str(tmp_path)])
+                self.executor.run(command, mutable=False)
+            elif source.startswith("file://"):
+                shutil.copyfile(Path(source[7:]), tmp_path)
+            else:
+                local = Path(source)
+                if not local.exists():
+                    raise FileNotFoundError(f"Source {source} not found")
+                shutil.copyfile(local, tmp_path)
+        except Exception:
+            self.cleanup(tmp_path)
+            raise
         return tmp_path
 
     @staticmethod
@@ -81,6 +85,9 @@ class RemoteFileOperation(Operation):
                 self.dest.unlink()
             return ActionResult(host=host.name, action="remote_file", changed=True, details="removed")
 
+        if executor.dry_run and not self.dest.exists():
+            return ActionResult(host=host.name, action="remote_file", changed=True, details="created")
+
         if (
             self.compare == "etag"
             and str(self.source).startswith("s3://")
@@ -90,7 +97,18 @@ class RemoteFileOperation(Operation):
             return ActionResult(host=host.name, action="remote_file", changed=False, details="noop")
 
         fetcher = RemoteFetcher(executor)
-        tmp = fetcher.fetch(str(self.source), verify_tls=self.verify_tls)
+        try:
+            tmp = fetcher.fetch(str(self.source), verify_tls=self.verify_tls)
+        except FileNotFoundError as exc:
+            if executor.dry_run:
+                tool = exc.filename or "download tool"
+                return ActionResult(
+                    host=host.name,
+                    action="remote_file",
+                    changed=True,
+                    details=f"update pending ({tool} unavailable for comparison)",
+                )
+            raise
         try:
             new_bytes = tmp.read_bytes()
             if self.checksum_algo and self.checksum_value:
@@ -160,23 +178,26 @@ class RemoteFileOperation(Operation):
             bucket, key = self._parse_s3(source)
         except ValueError:
             return False
-        result = executor.run(
-            [
-                "aws",
-                "s3api",
-                "head-object",
-                "--bucket",
-                bucket,
-                "--key",
-                key,
-                "--query",
-                "ETag",
-                "--output",
-                "text",
-            ],
-            check=False,
-            mutable=False,
-        )
+        try:
+            result = executor.run(
+                [
+                    "aws",
+                    "s3api",
+                    "head-object",
+                    "--bucket",
+                    bucket,
+                    "--key",
+                    key,
+                    "--query",
+                    "ETag",
+                    "--output",
+                    "text",
+                ],
+                check=False,
+                mutable=False,
+            )
+        except FileNotFoundError:
+            return False
         if result.returncode != 0:
             return False
         etag = result.stdout.strip().strip('"')
@@ -213,6 +234,9 @@ class RpmInstallOperation(Operation):
 
         if installed:
             return ActionResult(host=host.name, action="rpm", changed=False, details="already-installed")
+
+        if executor.dry_run:
+            return ActionResult(host=host.name, action="rpm", changed=True, details="installed")
 
         fetcher = RemoteFetcher(executor)
         tmp = fetcher.fetch(self.source)

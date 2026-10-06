@@ -7,8 +7,13 @@ from geppetto_automation.types import HostConfig
 
 
 class RecordingExecutor(Executor):
-    def __init__(self, responses: dict[tuple[str, ...], list[CommandResult]] | None = None):
-        super().__init__(HostConfig(name="local"))
+    def __init__(
+        self,
+        responses: dict[tuple[str, ...], list[CommandResult]] | None = None,
+        *,
+        dry_run: bool = False,
+    ):
+        super().__init__(HostConfig(name="local"), dry_run=dry_run)
         self.responses = responses or {}
         self.commands: list[tuple[str, ...]] = []
         self.invocations: list[tuple[tuple[str, ...], bool]] = []
@@ -129,6 +134,36 @@ def test_remote_file_fetch_commands_are_non_mutable_for_dry_run_compare(tmp_path
     assert curl_invocation[1] is False
 
 
+def test_remote_file_dry_run_does_not_fetch_when_destination_is_missing(tmp_path: Path):
+    dest = tmp_path / "output.bin"
+    executor = RecordingExecutor(dry_run=True)
+    op = RemoteFileOperation({"source": "s3://bucket/file.bin", "dest": str(dest)})
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert result.details == "created"
+    assert not any(command[0] == "aws" for command in executor.commands)
+
+
+def test_remote_file_dry_run_reports_update_when_download_tool_is_missing(tmp_path: Path):
+    class MissingAwsExecutor(RecordingExecutor):
+        def run(self, command, **kwargs):  # type: ignore[override]
+            if command[0] == "aws":
+                raise FileNotFoundError(2, "No such file or directory", "aws")
+            return super().run(command, **kwargs)
+
+    dest = tmp_path / "output.bin"
+    dest.write_text("existing")
+    executor = MissingAwsExecutor(dry_run=True)
+    op = RemoteFileOperation({"source": "s3://bucket/file.bin", "dest": str(dest)})
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert result.details == "update pending (aws unavailable for comparison)"
+
+
 def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):
     rpm_pkg = tmp_path / "pkg.rpm"
     rpm_pkg.write_text("rpmdata")
@@ -155,3 +190,17 @@ def test_rpm_installs_when_missing(tmp_path: Path, monkeypatch):
     result = op.apply(HostConfig("local"), executor)
     assert result.changed is True
     assert ("rpm", "-Uvh", str(rpm_pkg)) in executor.commands
+
+
+def test_rpm_dry_run_does_not_fetch_missing_package() -> None:
+    responses = {
+        ("rpm", "-q", "mypkg"): [CommandResult(["rpm"], "", "", 1)],
+    }
+    executor = RecordingExecutor(responses, dry_run=True)
+    op = RpmInstallOperation({"name": "mypkg", "source": "s3://bucket/pkg.rpm"})
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert result.details == "installed"
+    assert not any(command[0] == "aws" for command in executor.commands)

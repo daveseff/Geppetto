@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.5
+
+### Fixed
+- Dry-runs no longer download an RPM after determining that its package is not
+  installed, avoiding a dependency on download tooling that is only scheduled
+  for installation in the same plan.
+- Dry-runs no longer download remote files whose destinations do not yet exist.
+  Existing files are still compared when possible; if the required download
+  tool is unavailable, the dry-run conservatively reports a pending update.
+- Failed remote fetches now clean up their temporary files.
+
+### Changed
+- Bumped Python, RPM, and Arch package versions to `0.3.5`.
+
 ## 0.3.4
 
 ### Fixed
