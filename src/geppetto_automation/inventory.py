@@ -130,6 +130,7 @@ class InventoryLoader:
 
         def _assign(action: ActionSpec) -> None:
             action.data.setdefault("_plan_dir", base)
+            action.data.setdefault("_plan_root", base)
             for child in action.on_success:
                 _assign(child)
             for child in action.on_failure:

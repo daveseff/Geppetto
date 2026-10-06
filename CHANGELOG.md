@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.4
+
+### Fixed
+- Relative templates referenced by plans in an `includes/` directory are now
+  searched for in parent plan directories up to the bundle root. This supports
+  host layouts where `includes/` and `templates/` are sibling directories while
+  retaining the closest matching template.
+
+### Changed
+- Bumped Python, RPM, and Arch package versions to `0.3.4`.
+
 ## 0.3.3
 
 ### Fixed

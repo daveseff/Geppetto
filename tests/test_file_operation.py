@@ -118,6 +118,29 @@ def test_file_template_renders_host_variables(tmp_path: Path, monkeypatch) -> No
     assert target.read_text() == "Hello Geppetto from Dev"
 
 
+def test_file_template_searches_parent_plan_directories(tmp_path: Path) -> None:
+    host_dir = tmp_path / "hosts/host1"
+    include_dir = host_dir / "includes"
+    template_dir = host_dir / "templates"
+    include_dir.mkdir(parents=True)
+    template_dir.mkdir()
+    (template_dir / "app.tmpl").write_text("host template")
+    target = tmp_path / "output"
+    host = HostConfig(name="host1")
+    operation = FileOperation(
+        {
+            "path": str(target),
+            "template": "templates/app.tmpl",
+            "_plan_dir": str(include_dir),
+            "_plan_root": str(tmp_path),
+        }
+    )
+
+    operation.apply(host, build_executor())
+
+    assert target.read_text() == "host template"
+
+
 def test_file_template_renders_jinja_loop(tmp_path: Path) -> None:
     template = tmp_path / "hosts.j2"
     template.write_text(

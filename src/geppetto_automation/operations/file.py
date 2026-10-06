@@ -40,6 +40,7 @@ class FileOperation(Operation):
         self.template = spec.get("template")
         self.variables = spec.get("variables", {})
         self.plan_dir = spec.get("_plan_dir")
+        self.plan_root = spec.get("_plan_root")
         self.link_target = spec.get("link_target") or spec.get("target")
         self.owner_uid = self._parse_uid(spec.get("owner"))
         self.group_gid = self._parse_gid(spec.get("group"))
@@ -49,6 +50,8 @@ class FileOperation(Operation):
             raise ValueError("file operation variables must be a mapping")
         if self.plan_dir is not None:
             self.plan_dir = Path(str(self.plan_dir))
+        if self.plan_root is not None:
+            self.plan_root = Path(str(self.plan_root))
         if self.link_target is not None:
             self.link_target = str(self.link_target)
 
@@ -72,7 +75,7 @@ class FileOperation(Operation):
             return self.content
         template_path = Path(self.template).expanduser()
         if not template_path.is_absolute() and self.plan_dir is not None:
-            template_path = self.plan_dir / template_path
+            template_path = self._resolve_relative_template(template_path)
         template_text = template_path.read_text()
         if self._looks_like_jinja(template_text):
             if jinja2 is None:
@@ -83,6 +86,24 @@ class FileOperation(Operation):
         context = self.secret_resolver.resolve(context)
         template = Template(template_text)
         return template.safe_substitute(context)
+
+    def _resolve_relative_template(self, template_path: Path) -> Path:
+        candidate = self.plan_dir / template_path
+        if candidate.exists() or self.plan_root is None:
+            return candidate
+
+        current = self.plan_dir
+        while current != self.plan_root:
+            parent = current.parent
+            try:
+                parent.relative_to(self.plan_root)
+            except ValueError:
+                break
+            candidate = parent / template_path
+            if candidate.exists():
+                return candidate
+            current = parent
+        return self.plan_dir / template_path
 
     def _apply_symlink(self, host: HostConfig, executor: Executor) -> ActionResult:
         if self.state == "absent":

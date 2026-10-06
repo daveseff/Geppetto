@@ -119,6 +119,7 @@ def test_included_dsl_resource_keeps_its_plan_directory(tmp_path: Path) -> None:
 
     action = plan.tasks[0].actions[0]
     assert action.data["_plan_dir"] == str(host_dir)
+    assert action.data["_plan_root"] == str(tmp_path)
 
 
 def test_duplicate_dsl_include_is_loaded_once(tmp_path: Path) -> None:
