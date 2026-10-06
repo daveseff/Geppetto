@@ -127,6 +127,73 @@ def test_crontab_entry_absent_removes_only_matching_job() -> None:
     assert executor.installed == ["@daily /bin/backup\n"]
 
 
+def test_crontab_entry_schedule_change_updates_existing_job() -> None:
+    executor = CrontabExecutor(
+        "0 5 * * * /usr/sbin/aide --check\n"
+        "0 1 * * 3,5 /usr/local/bin/share_snapshot billing-centre-prd\n"
+    )
+    op = CronOperation(
+        {
+            "name": "billing-centre-share-snapshot",
+            "target": "crontab_entry",
+            "user": "root",
+            "minute": "0",
+            "hour": "1",
+            "weekday": "1-5",
+            "command": "/usr/local/bin/share_snapshot billing-centre-prd",
+        }
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert result.details == "updated"
+    assert executor.installed == [
+        "0 5 * * * /usr/sbin/aide --check\n"
+        "0 1 * * 1-5 /usr/local/bin/share_snapshot billing-centre-prd\n"
+    ]
+
+
+def test_crontab_entry_reconciles_duplicate_schedules() -> None:
+    command = "/usr/local/bin/share_snapshot billing-centre-prd"
+    executor = CrontabExecutor(
+        f"0 1 * * 3,5 {command}\n"
+        f"0 1 * * 1-5 {command}\n"
+    )
+    op = CronOperation(
+        {
+            "name": "billing-centre-share-snapshot",
+            "target": "crontab_entry",
+            "minute": "0",
+            "hour": "1",
+            "weekday": "1-5",
+            "command": command,
+        }
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert executor.installed == [f"0 1 * * 1-5 {command}\n"]
+
+
+def test_crontab_entry_absent_matches_command_after_schedule_change() -> None:
+    executor = CrontabExecutor("0 1 * * 3,5 /bin/backup\n@daily /bin/report\n")
+    op = CronOperation(
+        {
+            "name": "backup",
+            "target": "crontab_entry",
+            "command": "/bin/backup",
+            "state": "absent",
+        }
+    )
+
+    result = op.apply(HostConfig("local"), executor)
+
+    assert result.changed is True
+    assert executor.installed == ["@daily /bin/report\n"]
+
+
 def test_dry_run_crontab_entries_see_prior_planned_writes(monkeypatch) -> None:
     monkeypatch.setattr(
         "geppetto_automation.executors.subprocess.run",

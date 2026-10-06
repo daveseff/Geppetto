@@ -109,23 +109,27 @@ class CronOperation(Operation):
         lines = [] if no_crontab else current_result.stdout.splitlines()
         schedule = str(self.special) if self.special else "{minute} {hour} {day} {month} {weekday}".format(**self.schedule)
         desired = f"{schedule} {self.command}"
+        command_indexes = [
+            index for index, line in enumerate(lines) if self._entry_command(line) == self.command
+        ]
 
         if self.state == "absent":
-            updated = [line for line in lines if not self._entry_matches(line, desired)]
+            updated = [line for line in lines if self._entry_command(line) != self.command]
             if len(updated) == len(lines):
                 return ActionResult(host=host.name, action="cron", changed=False, details="noop")
             self._install_crontab(executor, updated)
             return ActionResult(host=host.name, action="cron", changed=True, details="removed")
 
         missing_env = [f"{key}={value}" for key, value in self.env.items() if f"{key}={value}" not in lines]
-        matching_indexes = [index for index, line in enumerate(lines) if self._entry_matches(line, desired)]
-        if matching_indexes and not missing_env:
+        if len(command_indexes) == 1 and lines[command_indexes[0]].strip() == desired and not missing_env:
             return ActionResult(host=host.name, action="cron", changed=False, details="noop")
 
         updated = list(lines)
-        if matching_indexes:
-            insert_at = matching_indexes[0]
+        if command_indexes:
+            insert_at = command_indexes[0]
+            updated = [line for line in updated if self._entry_command(line) != self.command]
             updated[insert_at:insert_at] = missing_env
+            updated.insert(insert_at + len(missing_env), desired)
         else:
             updated.extend(missing_env)
             updated.append(desired)
@@ -139,7 +143,12 @@ class CronOperation(Operation):
         executor.run(["crontab", "-u", self.user, "-"], mutable=True, input_text=content)
 
     @staticmethod
-    def _entry_matches(line: str, desired: str) -> bool:
-        if desired.startswith("@"):
-            return line.strip().split(None, 1) == desired.split(None, 1)
-        return line.strip().split(None, 5) == desired.split(None, 5)
+    def _entry_command(line: str) -> str | None:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            return None
+        if stripped.startswith("@"):
+            parts = stripped.split(None, 1)
+            return parts[1] if len(parts) == 2 else None
+        parts = stripped.split(None, 5)
+        return parts[5] if len(parts) == 6 else None

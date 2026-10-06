@@ -65,7 +65,7 @@ Each DSL resource maps to an operation with specific options. This reference lis
 - `state` (present|absent, default present).
 - `env` (map): environment variables.
 
-With `target => crontab_entry`, the resource manages one exact job in the user's crontab. `geppetto-auto import cron USER` emits one such resource per existing job so jobs can be adopted and removed independently. With `target => crontab`, the resource instead manages the complete crontab atomically; setting that resource absent removes the user's complete crontab.
+With `target => crontab_entry`, the resource identifies a job by its command within the user's crontab, so changing its schedule updates the existing entry. Duplicate entries with the same command are reconciled to one entry. Commands must therefore be unique within a user's managed crontab. `geppetto-auto import cron USER` emits one such resource per existing job so jobs can be adopted and removed independently. With `target => crontab`, the resource instead manages the complete crontab atomically; setting that resource absent removes the user's complete crontab.
 
 ## efs_mount
 - `filesystem_id` (string): EFS ID. Required.

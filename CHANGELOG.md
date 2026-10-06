@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.2
+
+### Fixed
+- User-crontab resources now identify jobs by command, so schedule changes
+  update the existing entry instead of creating a duplicate. Existing duplicate
+  entries for the same command are reconciled on the next apply.
+
+### Changed
+- Bumped Python, RPM, and Arch package versions to `0.3.2`.
+
 ## 0.3.1
 
 ### Added
