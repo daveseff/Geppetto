@@ -70,7 +70,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument("--reconcile-state", action="store_true",
                         help="Reconcile tracked resources with live existence; never apply or clean up resources")
-    parser.add_argument("--skip-sync", action="store_true", help="Use cached configuration without refreshing it")
+    sync_options = parser.add_mutually_exclusive_group()
+    sync_options.add_argument("--skip-sync", action="store_true",
+                              help="Use cached configuration without refreshing it")
+    sync_options.add_argument("--refresh-config", action="store_true",
+                              help="Refresh configuration before validation, including during reconciliation dry-run (writes config cache)")
     parser.add_argument("--dry-run", action="store_true", help="Calculate changes without executing")
     parser.add_argument(
         "--log-level",
@@ -174,7 +178,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(colorize(f"Plugin load failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
     try:
-        if not args.skip_sync and not args.reconcile_state:
+        if not args.skip_sync and (not args.reconcile_state or args.refresh_config):
             _sync_config_service(cfg)
             _sync_config_repo(cfg)
     except RuntimeError as exc:
@@ -187,6 +191,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except (DSLParseError, ValueError) as exc:
         _clear_progress()
         print(colorize(f"Plan validation failed: {exc}", Ansi.RED), file=sys.stderr)
+        if args.reconcile_state and not args.refresh_config:
+            print("Reconciliation uses cached configuration. Add --refresh-config to download current configuration before validation (writes config cache, even with --dry-run).", file=sys.stderr)
         return 1
     if _uses_default_service_plan(args.plan, cfg):
         plan = _scope_plan_to_host(plan, resolve_config_service_host(cfg))

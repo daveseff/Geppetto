@@ -94,3 +94,48 @@ def test_reconcile_cli_does_not_sync_log_or_apply(tmp_path, monkeypatch, capsys)
     assert not path.exists()
     assert not (tmp_path / 'log').exists()
     assert target.read_text() == 'live'
+
+
+def test_reconcile_refreshes_stale_config_before_validation(tmp_path, monkeypatch, capsys):
+    plan = tmp_path / 'plan.fops'
+    header = "node 'local' { connection => local }\ntask 'keys' on 'local' { "
+    plan.write_text(header + "authorized_key { 'ansible': user => 'ansible' key => 'ssh-rsa AAA\nssh-ed25519 BBB' } }")
+    config = tmp_path / 'main.conf'
+    config.write_text('[defaults]\n')
+    state = tmp_path / 'state.json'
+    events = []
+    def refresh(cfg):
+        events.append('refresh')
+        plan.write_text("node 'local' { connection => local }\n")
+    monkeypatch.setattr(cli, '_sync_config_service', refresh)
+    monkeypatch.setattr(cli, '_sync_config_repo', lambda cfg: events.append('repo'))
+    def forbidden(*args):
+        raise AssertionError('must never apply resources')
+    monkeypatch.setattr(cli.TaskRunner, 'run', forbidden)
+    args = [str(plan), '--config', str(config), '--state-file', str(state), '--reconcile-state', '--dry-run']
+    assert cli.main(args) == 1
+    assert events == []
+    assert '--refresh-config' in capsys.readouterr().err
+    assert cli.main(args + ['--refresh-config']) == 0
+    assert events == ['refresh', 'repo']
+    assert not state.exists()
+    assert not list(tmp_path.glob('*.bak'))
+
+
+def test_refresh_and_skip_sync_are_mutually_exclusive():
+    import pytest
+    with pytest.raises(SystemExit):
+        cli.parse_args(['--refresh-config', '--skip-sync'])
+
+
+def test_reconcile_refresh_failure_does_not_load_or_reconcile(tmp_path, monkeypatch):
+    config = tmp_path / 'main.conf'
+    config.write_text('[defaults]\n')
+    def fail(cfg):
+        raise RuntimeError('config server unavailable')
+    def forbidden(*args, **kwargs):
+        raise AssertionError('must stop after refresh failure')
+    monkeypatch.setattr(cli, '_sync_config_service', fail)
+    monkeypatch.setattr(cli.InventoryLoader, 'load', forbidden)
+    monkeypatch.setattr(cli, 'reconcile_state', forbidden)
+    assert cli.main(['--config', str(config), '--reconcile-state', '--dry-run', '--refresh-config']) == 1

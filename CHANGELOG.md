@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.7
+
+### Added
+- `--refresh-config` explicitly refreshes cached configuration before validation
+  during state reconciliation, including dry-run. This resolves stale plans that
+  fail the new single-key validation. It cannot be combined with `--skip-sync`.
+
 ## 0.3.6
 
 ### Fixed

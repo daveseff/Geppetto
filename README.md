@@ -282,9 +282,18 @@ state against the local host without applying resources or running cleanup:
 ```sh
 # Preview: no configuration refresh, log file writes, state writes or backups.
 geppetto-auto --reconcile-state --dry-run
+# If cached config is stale, refresh it BEFORE validation (writes config cache):
+geppetto-auto --reconcile-state --dry-run --refresh-config
 # Save after reviewing the preview (writes state and a timestamped backup only).
 geppetto-auto --reconcile-state
 ```
+
+Reconciliation defaults to cached configuration. If the server has corrected a
+plan that now fails validation locally, add `--refresh-config` to download the
+latest configuration before validation. This explicitly permits configuration
+cache writes even with `--dry-run`; managed resources and state are still only
+inspected. `--refresh-config` and `--skip-sync` cannot be combined. A refresh
+failure stops the run before validation or reconciliation.
 
 Reconciliation requires a plan scoped to one local host (the config-service
 agent default already does this). It probes packages, files/directories/symlinks,

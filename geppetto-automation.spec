@@ -1,5 +1,5 @@
 Name:           geppetto_automation
-Version:        0.3.6
+Version:        0.3.7
 Release:        1%{?dist}
 Summary:        Geppetto automation tools
 
