@@ -51,6 +51,15 @@ class InventoryLoader:
         except tomllib.TOMLDecodeError as exc:
             raise ValueError(f"{path}:{exc.lineno}:{exc.colno} {exc.msg}") from None
 
+        # Validate all resources, including conditional hooks, before any apply.
+        from .identity import plan_actions
+        from .operations.authorized_key import AuthorizedKeyOperation
+        for _, action in plan_actions(plan):
+            if action.type == "authorized_key":
+                try:
+                    AuthorizedKeyOperation.validate_key(action.data.get("key"), resource=action.data.get("name"))
+                except ValueError as exc:
+                    raise ValueError(f"{path}: {exc}") from None
         self._attach_plan_dir(plan, base_dir)
         return plan
 

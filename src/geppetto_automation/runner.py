@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from .identity import resource_id
 from .executors import AgentExecutor, Executor, LocalExecutor
 from .operations import OPERATION_REGISTRY, Operation
 from .types import ActionResult, ActionSpec, HostConfig, Plan, TaskSpec
@@ -99,7 +100,7 @@ class TaskRunner:
                 resource=self._resource_name(action.data),
             )
         else:
-            if self.state_store:
+            if self.state_store and not result.failed:
                 self.state_store.record(host.name, action)
         logger.debug("action=%s host=%s changed=%s", action.type, host.name, result.changed)
         if result.resource is None:
@@ -159,11 +160,19 @@ class TaskRunner:
             return []
         ids = [self._action_id(action, idx) for idx, action in enumerate(actions, start=1)]
         id_map = dict(zip(ids, actions))
+        # Named dependencies remain compatible with older plans, including keys
+        # whose identity now includes the user and key material.
+        aliases = {}
+        for aid, action in zip(ids, actions):
+            name = self._resource_name(action.data)
+            if name:
+                aliases.setdefault(f"{action.type}.{name}", set()).add(aid)
         graph: dict[str, set[str]] = {aid: set() for aid in ids}
         in_degree: dict[str, int] = {aid: 0 for aid in ids}
 
         for aid, action in zip(ids, actions):
-            deps = {dep for dep in action.depends_on if dep in id_map}
+            deps = {resolved for dep in action.depends_on
+                    for resolved in aliases.get(dep, {dep}) if resolved in id_map}
             graph[aid] = deps
             in_degree[aid] = len(deps)
 
@@ -187,10 +196,6 @@ class TaskRunner:
         return [id_map[aid] for aid in ordered_ids]
 
     def _action_id(self, action: ActionSpec, index: int) -> str:
-        name = self._resource_name(action.data)
-        if name:
-            identifier = f"{action.type}.{name}"
-        else:
-            identifier = f"{action.type}.__{index}"
-        action.data.setdefault("_resource_id", identifier)
+        identifier = resource_id(action)
+        action.data["_resource_id"] = identifier
         return identifier

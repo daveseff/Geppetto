@@ -74,3 +74,23 @@ def test_main_routes_all_user_crontab_import(monkeypatch, capsys):
 
     assert result == 0
     assert capsys.readouterr().out == "all:None:None\n"
+
+
+def test_reconcile_cli_does_not_sync_log_or_apply(tmp_path, monkeypatch, capsys):
+    target = tmp_path / 'managed'
+    target.write_text('live')
+    plan = tmp_path / 'plan.fops'
+    plan.write_text("node 'local' { connection => local }\ntask 'demo' on 'local' { file { '" + str(target) + "': content => 'desired' } }")
+    config = tmp_path / 'main.conf'
+    config.write_text('[defaults]\nlog_file = "' + str(tmp_path / 'log') + '"\n')
+    def forbidden(*args):
+        raise AssertionError('reconciliation must not sync or apply')
+    monkeypatch.setattr(cli, '_sync_config_service', forbidden)
+    monkeypatch.setattr(cli, '_sync_config_repo', forbidden)
+    monkeypatch.setattr(cli.TaskRunner, 'run', forbidden)
+    path = tmp_path / 'state.json'
+    assert cli.main([str(plan), '--config', str(config), '--state-file', str(path), '--reconcile-state', '--dry-run']) == 0
+    assert 'live: tracked' in capsys.readouterr().out
+    assert not path.exists()
+    assert not (tmp_path / 'log').exists()
+    assert target.read_text() == 'live'

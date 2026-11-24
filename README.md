@@ -269,6 +269,58 @@ If the loader detects a `.fops` extension (or the DSL syntax), it automatically 
 
 The CLI returns zero on success and prints a concise status line per host/action pair. If you provide no path argument the runner defaults to `/etc/geppetto/plan.fops`, and relative template references resolve beneath `/etc/geppetto` (or whatever directory the plan lives in). Each run also maintains a state file (`plan.fops.state.json` by default) so that removing a resource from the plan automatically triggers the appropriate teardown (file removal, user deletion, unmounts, etc.). You can override the state location via `--state-file`. Dry-runs read this state and preview those teardown actions, but never update the state file or the managed resources. Sequential crontab changes are simulated in memory so their dry-run results match apply ordering.
 
+Resource tracking uses stable target identities, independent of task order and
+include-file paths. Package lists and multiline authorized-key resources are
+tracked per package/key. Existing state files migrate automatically in memory;
+normal apply saves the migrated state and dry-run leaves the file untouched.
+Packages still declared in the plan are protected from stale-state cleanup.
+Resources in conditional hooks remain managed even when the hook does not run.
+
+To repair tracking after manual host changes, use the cached plan to reconcile
+state against the local host without applying resources or running cleanup:
+
+```sh
+# Preview: no configuration refresh, log file writes, state writes or backups.
+geppetto-auto --reconcile-state --dry-run
+# Save after reviewing the preview (writes state and a timestamped backup only).
+geppetto-auto --reconcile-state
+```
+
+Reconciliation requires a plan scoped to one local host (the config-service
+agent default already does this). It probes packages, files/directories/symlinks,
+remote-file destinations, users, groups and authorized keys from both the plan
+and previous state, including hook resources. Missing resources are dropped from
+tracking; existing ones are adopted using stable IDs. Live resources removed from
+the plan remain tracked so a later normal apply can still clean them up. It does
+not import unrelated host resources or claim that contents, permissions or
+versions match the plan. Other resource types are reported as unsupported and
+retain their existing tracking. Query failures abort without saving state.
+State writes are atomic, mode 0600; reconciliation first creates a timestamped
+0600 backup beside an existing state file.
+
+`--skip-sync` also allows a normal run or dry-run against cached configuration.
+Normal `--dry-run` alone still refreshes configuration and writes its log as
+before. Each `authorized_key` resource must contain exactly one public key. Plan
+validation rejects multiple keys (including base64-encoded bundles) before any
+resources are applied, including keys inside conditional hooks. Define separate,
+uniquely named resources for multiple keys:
+
+```text
+authorized_key { 'ansible-exec':
+  user => 'ansible'
+  key => 'ssh-rsa AAA... execution key'
+}
+authorized_key { 'ansible-management':
+  user => 'ansible'
+  key => 'ssh-ed25519 AAA... management key'
+}
+```
+
+Apply repairs exact duplicates of a managed key while preserving unrelated keys,
+comments and SSH options. Legacy state containing multiple keys remains readable
+and migrates into individually tracked keys.
+
+
 ### Tests
 
 Unit tests live under `tests/` and use `pytest`:

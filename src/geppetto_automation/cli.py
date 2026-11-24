@@ -24,6 +24,7 @@ from .inventory import InventoryLoader
 from .importers import import_all_crontabs, import_crontab
 from .runner import TaskRunner
 from .state import StateStore
+from .reconcile import reconcile_state
 from .types import ActionResult, HostConfig, Plan
 from .operations import OPERATION_REGISTRY
 
@@ -67,6 +68,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=Path("/etc/geppetto/main.conf"),
         help="Path to geppetto config file (default: /etc/geppetto/main.conf)",
     )
+    parser.add_argument("--reconcile-state", action="store_true",
+                        help="Reconcile tracked resources with live existence; never apply or clean up resources")
+    parser.add_argument("--skip-sync", action="store_true", help="Use cached configuration without refreshing it")
     parser.add_argument("--dry-run", action="store_true", help="Calculate changes without executing")
     parser.add_argument(
         "--log-level",
@@ -161,7 +165,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     cfg = load_config(args.config)
-    configure_logging(args.log_level, log_file=cfg.log_file)
+    configure_logging(args.log_level, log_file=None if args.reconcile_state else cfg.log_file)
     _apply_aws_env(cfg)
     try:
         _validate_config_sources(cfg)
@@ -170,8 +174,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(colorize(f"Plugin load failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
     try:
-        _sync_config_service(cfg)
-        _sync_config_repo(cfg)
+        if not args.skip_sync and not args.reconcile_state:
+            _sync_config_service(cfg)
+            _sync_config_repo(cfg)
     except RuntimeError as exc:
         print(colorize(f"Config sync failed: {exc}", Ansi.RED), file=sys.stderr)
         return 1
@@ -199,7 +204,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         progress_callback=print_progress,
     )
     try:
-        results = runner.run()
+        results = (reconcile_state(plan, state_store, dry_run=args.dry_run)
+                   if args.reconcile_state else runner.run())
     except Exception as exc:  # noqa: BLE001
         _clear_progress()
         if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -213,12 +219,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         _clear_progress()
         summary.add(result)
         log_result(result)
-        if not should_display_result(result, effective_level):
+        if not args.reconcile_state and not should_display_result(result, effective_level):
             continue
         print(format_result(result))
 
     _clear_progress()
     print(summary.render())
+    if args.reconcile_state:
+        print(f"State reconciliation {'preview (no files written)' if args.dry_run else 'saved (previous state backed up)'}: {state_path}")
 
     return 0
 

@@ -5,9 +5,14 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Optional
 import os
+import tempfile
+import shutil
+from datetime import datetime, timezone
+
+from .identity import plan_actions, state_actions
 
 from .operations import OPERATION_REGISTRY
-from .types import ActionResult, HostConfig
+from .types import ActionResult, ActionSpec, HostConfig
 
 logger = logging.getLogger(__name__)
 
@@ -57,22 +62,47 @@ class StateStore:
     def record(self, host: str, action) -> None:
         if action.type not in DESTROY_BUILDERS:
             return
-        spec = _normalize_value(action.data)
-        resource_id = spec.get("_resource_id")
-        key = resource_id or self._make_key(action.type, spec)
-        entry = {
-            "action": action.type,
-            "spec": spec,
-            "resource_id": resource_id,
-            "depends_on": list(action.depends_on),
-        }
-        self.current.setdefault(host, {})[key] = entry
+        for item in state_actions(action):
+            spec = _normalize_value(item.data)
+            key = spec["_resource_id"]
+            entry = {
+                "action": item.type,
+                "spec": spec,
+                "resource_id": key,
+                "depends_on": list(item.depends_on),
+            }
+            self.current.setdefault(host, {})[key] = entry
+
+    def _migrate(self, data):
+        migrated = {}
+        for host, entries in data.items():
+            aliases = {}
+            for old_key, entry in entries.items():
+                action = ActionSpec(entry["action"], entry["spec"], entry.get("depends_on", []))
+                new_keys = []
+                for item in state_actions(action):
+                    key = item.data["_resource_id"]
+                    new_keys.append(key)
+                    migrated.setdefault(host, {})[key] = {
+                        **entry, "spec": item.data, "resource_id": key,
+                    }
+                aliases[entry.get("resource_id") or old_key] = new_keys
+            for entry in migrated.get(host, {}).values():
+                entry["depends_on"] = [
+                    key for dep in entry.get("depends_on", []) for key in aliases.get(dep, [dep])
+                ]
+        return migrated
 
     def finalize(self, plan, executor_factory, *, persist: bool = True) -> list[ActionResult]:
         results: list[ActionResult] = []
+        desired = {}
+        for host_name, action in plan_actions(plan):
+            for item in state_actions(action):
+                desired.setdefault(host_name, set()).add(item.data["_resource_id"])
         for host_name, entries in list(self.previous.items()):
             host = plan.hosts.get(host_name)
             if not host:
+                self.current.setdefault(host_name, {}).update(entries)
                 logger.debug("Skipping cleanup for unknown host %s", host_name)
                 continue
             ordered_keys = self._order_entries(entries, reverse=True)
@@ -80,9 +110,17 @@ class StateStore:
                 if key in self.current.get(host_name, {}):
                     continue
                 entry = entries[key]
+                if key in desired.get(host_name, set()):
+                    # A failed action or an untriggered hook is still managed.
+                    self.current.setdefault(host_name, {})[key] = entry
+                    continue
                 result = self._destroy_entry(host, entry, executor_factory)
-                if result is not None:
+                if result is None:
+                    self.current.setdefault(host_name, {})[key] = entry
+                else:
                     results.append(result)
+                    if result.failed:
+                        self.current.setdefault(host_name, {})[key] = entry
         if persist:
             self._write()
         return results
@@ -111,21 +149,31 @@ class StateStore:
                 failed=True,
             )
 
-    def _write(self) -> None:
-        data = self.current
+    def _write(self, *, backup: bool = False) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=2))
+        if backup and self.path.exists():
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+            backup_path = self.path.with_name(self.path.name + "." + stamp + ".bak")
+            fd = os.open(backup_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as dest, self.path.open("rb") as source:
+                shutil.copyfileobj(source, dest)
+        fd, temporary = tempfile.mkstemp(prefix=self.path.name + ".", dir=self.path.parent)
         try:
-            os.chmod(self.path, 0o600)
-        except OSError:
-            logger.debug("Unable to chmod state file %s", self.path, exc_info=True)
-        self.previous = data
+            with os.fdopen(fd, "w") as output:
+                json.dump(self.current, output, indent=2)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self.path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        self.previous = self.current
 
     def _load(self) -> dict[str, dict[str, dict[str, Any]]]:
         if not self.path.exists():
             return {}
         try:
-            return json.loads(self.path.read_text())
+            return self._migrate(json.loads(self.path.read_text()))
         except json.JSONDecodeError:
             logger.warning("State file %s is corrupt; starting fresh", self.path)
             return {}

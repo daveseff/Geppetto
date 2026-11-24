@@ -65,3 +65,49 @@ def test_removes_existing_key(tmp_path: Path):
 
     assert result.changed is True
     assert manager.contents[auth_file] == "ssh-rsa AAA\n"
+
+
+def test_managed_key_is_idempotent_and_repairs_only_its_duplicates(tmp_path):
+    manager = FakeManager(tmp_path)
+    path = tmp_path / '.ssh' / 'authorized_keys'
+    manager.contents[path] = '# keep comment\nssh-rsa AAA first\nssh-ed25519 BBB second\nssh-rsa AAA first\nssh-ed25519 BBB second\nrestrict ssh-rsa AAA restricted\n'
+    op = AuthorizedKeyOperation({'user': 'ansible', 'key': 'ssh-rsa AAA first'})
+    op.manager = manager
+    assert op.apply(HostConfig('local'), executor_stub()).changed
+    expected = '# keep comment\nssh-rsa AAA first\nssh-ed25519 BBB second\nssh-ed25519 BBB second\nrestrict ssh-rsa AAA restricted\n'
+    assert manager.contents[path] == expected
+    assert not op.apply(HostConfig('local'), executor_stub()).changed
+    op.state = 'absent'
+    assert op.apply(HostConfig('local'), executor_stub()).changed
+    assert manager.contents[path] == '# keep comment\nssh-ed25519 BBB second\nssh-ed25519 BBB second\nrestrict ssh-rsa AAA restricted\n'
+
+
+def test_duplicate_repair_dry_run(tmp_path):
+    manager = FakeManager(tmp_path)
+    path = tmp_path / '.ssh' / 'authorized_keys'
+    original = 'ssh-rsa AAA\nssh-rsa AAA\nssh-ed25519 BBB\n'
+    manager.contents[path] = original
+    op = AuthorizedKeyOperation({'user': 'ansible', 'key': 'ssh-rsa AAA'})
+    op.manager = manager
+    executor = executor_stub()
+    executor.dry_run = True
+    assert op.apply(HostConfig('local'), executor).changed
+    assert manager.contents[path] == original
+
+
+
+def test_rejects_multiple_keys_in_one_resource():
+    import base64
+    import pytest
+    bundle = 'ssh-rsa AAA first\nssh-ed25519 BBB second'
+    for value in (bundle, base64.b64encode(bundle.encode()).decode(),
+                  'ssh-rsa AAA\nssh-rsa AAA', ['ssh-rsa AAA', 'ssh-ed25519 BBB']):
+        with pytest.raises(ValueError, match='separate authorized_key resource'):
+            AuthorizedKeyOperation({'user': 'ansible', 'name': 'ansible', 'key': value})
+
+
+def test_accepts_single_key_with_options_comment_and_surrounding_whitespace():
+    import base64
+    key = 'restrict ssh-ed25519 AAA management key'
+    for value in ('\n' + key + '\n', base64.b64encode(key.encode()).decode()):
+        assert AuthorizedKeyOperation({'user': 'ansible', 'key': value}).key == key

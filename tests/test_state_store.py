@@ -120,3 +120,74 @@ def test_dry_run_previews_multiple_removed_crontab_entries(tmp_path: Path, monke
     assert len(results) == 4
     assert all(result.changed and result.details == "removed" for result in results)
     assert json.loads(state_path.read_text()) == state_data
+
+
+def test_legacy_bulk_packages_migrate_without_removing_required_members(tmp_path, monkeypatch):
+    from geppetto_automation.types import ActionSpec, TaskSpec, ActionResult
+    state_path = tmp_path / 'state.json'
+    state_path.write_text(json.dumps({'local': {
+        'package.__2': {'action': 'package', 'spec': {'packages': ['jq', 'rsync', 'old-package'], '_resource_id': 'package.__2'}},
+        'package.__1': {'action': 'package', 'spec': {'packages': ['newrelic-infra'], '_resource_id': 'package.__1'}},
+    }}))
+    plan = Plan({'local': HostConfig('local')}, [
+        TaskSpec('packages', ['local'], [ActionSpec('package', {'packages': ['rsync', 'jq', 'new-package']})]),
+        TaskSpec('newrelic', ['local'], [ActionSpec('package', {'packages': ['newrelic-infra']})]),
+    ])
+    calls = []
+    class Package:
+        def __init__(self, spec):
+            self.spec = spec
+        def apply(self, host, executor):
+            calls.append(self.spec)
+            return ActionResult(host.name, 'package', True, 'ok')
+    monkeypatch.setitem(__import__('geppetto_automation.runner', fromlist=['OPERATION_REGISTRY']).OPERATION_REGISTRY, 'package', Package)
+    TaskRunner(plan, state_store=StateStore(state_path)).run()
+    removals = [spec['name'] for spec in calls if spec.get('state') == 'absent']
+    assert removals == ['old-package']
+    assert set(json.loads(state_path.read_text())['local']) == {
+        'package.jq', 'package.rsync', 'package.new-package', 'package.newrelic-infra'}
+
+
+def test_skipped_hook_and_failed_action_remain_tracked(tmp_path, monkeypatch):
+    from geppetto_automation.types import ActionSpec, TaskSpec, ActionResult
+    path = tmp_path / 'state.json'
+    store = StateStore(path)
+    child = ActionSpec('file', {'path': str(tmp_path / 'child')})
+    failing = ActionSpec('file', {'path': str(tmp_path / 'failing')})
+    store.record('local', child)
+    store.record('local', failing)
+    store._write()
+    class File:
+        def __init__(self, spec):
+            self.spec = spec
+        def apply(self, host, executor):
+            assert self.spec.get('state') != 'absent'
+            return ActionResult(host.name, 'file', False, 'failed', failed=True)
+    class Parent:
+        def __init__(self, spec): pass
+        def apply(self, host, executor):
+            return ActionResult(host.name, 'exec', False, 'noop')
+    from geppetto_automation.runner import OPERATION_REGISTRY
+    monkeypatch.setitem(OPERATION_REGISTRY, 'file', File)
+    monkeypatch.setitem(OPERATION_REGISTRY, 'exec', Parent)
+    plan = Plan({'local': HostConfig('local')}, [TaskSpec('demo', ['local'], [
+        ActionSpec('exec', {'name': 'parent'}, on_success=[child]), failing])])
+    results = TaskRunner(plan, state_store=StateStore(path)).run()
+    assert len(results) == 2
+    assert len(json.loads(path.read_text())['local']) == 2
+
+
+def test_key_rotation_cleanup_preserves_shared_keys(tmp_path):
+    from geppetto_automation.types import ActionSpec, TaskSpec
+    path = tmp_path / 'state.json'
+    store = StateStore(path)
+    store.record('local', ActionSpec('authorized_key', {'user': 'ansible', 'name': 'keys', 'key': 'ssh-rsa AAA\nssh-rsa BBB'}))
+    store._write()
+    store = StateStore(path)
+    action = ActionSpec('authorized_key', {'user': 'ansible', 'name': 'renamed', 'key': 'ssh-rsa BBB\nssh-rsa CCC'})
+    store.record('local', action)
+    removed = []
+    store._destroy_entry = lambda host, entry, factory: removed.append(entry['spec']['key'])
+    plan = Plan({'local': HostConfig('local')}, [TaskSpec('keys', ['local'], [action])])
+    store.finalize(plan, None, persist=False)
+    assert removed == ['ssh-rsa AAA']

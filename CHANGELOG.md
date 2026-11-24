@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.6
+
+### Fixed
+- Resource identity no longer depends on action position or include-file location.
+  Migrate existing state and track package lists and SSH key bundles per member,
+  preventing cleanup of packages that remain in the plan and identity collisions.
+- Preserve tracking for failed actions, failed cleanup and untriggered hooks.
+- Reject multiple public keys in one authorized-key resource during plan validation,
+  including encoded bundles and conditional hooks. Legacy state bundles still migrate
+  per key. Repair exact duplicates of managed keys without changing unrelated keys
+  or SSH options.
+- Write state atomically with restrictive permissions.
+
+### Added
+- `--reconcile-state` probes live packages, files, remote-file destinations, users,
+  groups and authorized keys without applying resources or running cleanup.
+  Preview with `--dry-run`; saves include a timestamped state backup. Unsupported
+  resource tracking is retained; probe failures prevent saving. Config sync and
+  file logging are disabled for reconciliation.
+- `--skip-sync` to run against cached configuration.
+
 ## 0.3.5
 
 ### Fixed

@@ -56,11 +56,26 @@ class AuthorizedKeyOperation(Operation):
         raw_key = spec.get("key")
         if not raw_key:
             raise ValueError("authorized_key operation requires a key")
+        self.validate_key(raw_key, resource=spec.get("name"))
         self.key = self._normalize_key(str(raw_key))
+        self.keys = self._split_keys(self.key)
+        if not self.keys:
+            raise ValueError("authorized_key requires at least one key")
         self.state = str(spec.get("state", "present"))
         if self.state not in {"present", "absent"}:
             raise ValueError("authorized_key state must be 'present' or 'absent'")
         self.manager = AuthorizedKeyManager()
+
+    @classmethod
+    def validate_key(cls, raw, *, resource=None) -> None:
+        label = f"authorized_key {resource!r}" if resource else "authorized_key"
+        message = f"{label}: exactly one SSH public key is allowed per resource; define a separate authorized_key resource for each key"
+        if not isinstance(raw, str):
+            raise ValueError(message)
+        text = cls._normalize_key(raw)
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(lines) != 1:
+            raise ValueError(message)
 
     @staticmethod
     def _normalize_key(raw: str) -> str:
@@ -81,17 +96,20 @@ class AuthorizedKeyOperation(Operation):
         auth_file = ssh_dir / "authorized_keys"
 
         existing = self.manager.read(auth_file)
-        keys = self._split_keys(existing)
-        changed = False
-
-        if self.state == "present":
-            if self.key not in keys:
-                keys.append(self.key)
-                changed = True
-        else:
-            if self.key in keys:
-                keys.remove(self.key)
-                changed = True
+        original = [line.strip() for line in existing.splitlines() if line.strip()]
+        # Preserve comments, options and unrelated keys exactly; compare whole lines.
+        keys = list(original)
+        for key in self.keys:
+            indices = [index for index, line in enumerate(keys) if line == key]
+            if self.state == "present":
+                if not indices:
+                    keys.append(key)
+                elif len(indices) > 1:
+                    first = indices[0]
+                    keys = [line for index, line in enumerate(keys) if line != key or index == first]
+            else:
+                keys = [line for line in keys if line != key]
+        changed = keys != original
 
         detail = "noop"
         if changed:
