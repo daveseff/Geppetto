@@ -206,6 +206,11 @@ class UserOperation(Operation):
                 self.manager.delete(executor, self.name, remove_home=self.remove_home)
                 changes.append("removed")
 
+        if executor.dry_run:
+            # Share the simulated account state with later resources on this host.
+            if not hasattr(executor, "simulated_users"):
+                executor.simulated_users = {}
+            executor.simulated_users[self.name] = self.state
         changed = bool(changes)
         detail = ", ".join(changes) if changes else "noop"
         return ActionResult(host=host.name, action="user", changed=changed, details=detail)

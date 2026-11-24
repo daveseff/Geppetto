@@ -269,6 +269,61 @@ If the loader detects a `.fops` extension (or the DSL syntax), it automatically 
 
 The CLI returns zero on success and prints a concise status line per host/action pair. If you provide no path argument the runner defaults to `/etc/geppetto/plan.fops`, and relative template references resolve beneath `/etc/geppetto` (or whatever directory the plan lives in). Each run also maintains a state file (`plan.fops.state.json` by default) so that removing a resource from the plan automatically triggers the appropriate teardown (file removal, user deletion, unmounts, etc.). You can override the state location via `--state-file`. Dry-runs read this state and preview those teardown actions, but never update the state file or the managed resources. Sequential crontab changes are simulated in memory so their dry-run results match apply ordering.
 
+Dry-run results indent dependent resources with `\_` and label their declared
+prerequisites. Unchanged prerequisites remain visible when a dependent resource
+has changes. Indentation reflects dependency depth; the labels identify every
+prerequisite when a resource has more than one. Live runs keep their flat output.
+Conditional hooks are also shown beneath their parent resource.
+
+For a user followed by dependent keys, the preview includes:
+
+```text
+prd-hvr-agent::user[ansible] changed - created
+\_ prd-hvr-agent::authorized_key[ansible-exec] changed - added (after planned user creation) ... (depends on: user.ansible)
+\_ prd-hvr-agent::authorized_key[ansible-management] changed - added (after planned user creation) ... (depends on: user.ansible)
+```
+
+Successful simulated user creation is shared with later key resources on the
+same host, so they can preview additions before the real account exists. This
+only affects dry-run: no accounts or keys are written. A key for a missing user
+still fails if no earlier user creation was successfully simulated.
+
+To apply just one of the changes shown by a dry-run, copy the `target=` address
+from its result and pass it to `--target`:
+
+```sh
+geppetto-auto --dry-run
+geppetto-auto --dry-run --target 'authorized_key.ansible-exec'
+geppetto-auto --target 'authorized_key.ansible-exec'
+# Repeat the flag for several resources, or qualify a target with its host:
+geppetto-auto --target 'prd-hvr-agent::file./etc/sudoers.d/ansible' --target 'package.jq'
+```
+
+Targets accept `TYPE.NAME`, `HOST::TYPE.NAME`, or the stable resource ID. For a
+file, NAME can be its path; for a key it is the resource title. An individual
+package can be selected from a package list using `package.NAME`; the displayed
+ID for a whole package list selects that entire list. Multiple selected members
+of one list execute together so its hooks run once. Unqualified targets must
+match uniquely; specify the host when several hosts declare the same resource.
+
+Targeted runs automatically include transitive `depends_on` prerequisites,
+including across tasks on the same host. Dependencies that already match the
+host are checked as no-ops. Failed prerequisites skip dependent resources and
+return a nonzero exit code. Selection rejects unknown or ambiguous references
+and dependency cycles before applying resources. Only declared dependencies are
+followed; prerequisites implicit in commands or external services must be
+expressed using `depends_on`.
+
+A selected resource retains its `on_success`/`on_failure` hooks. Their declared
+external prerequisites are included conservatively, even if a hook ultimately
+does not run. Hooks cannot be targeted directly: select their parent; hook
+results display that parent target. Targeted runs disable automatic cleanup and
+preserve all unselected state, including resources no longer in the plan. To
+target a removal, keep the resource in the plan with `ensure => absent`.
+`--target` cannot be combined with `--reconcile-state`. Configuration refresh
+continues to follow the normal run rules; use `--skip-sync` to use the cached
+plan. Review a full dry-run afterwards to see remaining changes.
+
 Resource tracking uses stable target identities, independent of task order and
 include-file paths. Package lists and multiline authorized-key resources are
 tracked per package/key. Existing state files migrate automatically in memory;

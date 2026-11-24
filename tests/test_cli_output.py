@@ -139,3 +139,27 @@ def test_reconcile_refresh_failure_does_not_load_or_reconcile(tmp_path, monkeypa
     monkeypatch.setattr(cli.InventoryLoader, 'load', forbidden)
     monkeypatch.setattr(cli, 'reconcile_state', forbidden)
     assert cli.main(['--config', str(config), '--reconcile-state', '--dry-run', '--refresh-config']) == 1
+
+
+def test_target_cli_applies_only_selected_file(tmp_path, monkeypatch, capsys):
+    from geppetto_automation import cli
+    one, two = tmp_path / 'one', tmp_path / 'two'
+    plan = tmp_path / 'plan.fops'
+    plan.write_text("node 'local' { connection => local }\ntask 'files' on 'local' {\n" +
+                    ''.join("file { '" + str(path) + "': content => 'new' }\n" for path in (one, two)) + '}')
+    config = tmp_path / 'main.conf'
+    config.write_text('[defaults]\nlog_file = "' + str(tmp_path / 'log') + '"\n')
+    state = tmp_path / 'state.json'
+    args = [str(plan), '--config', str(config), '--state-file', str(state), '--skip-sync', '--target', f'file.{one}']
+    assert cli.main(args + ['--dry-run']) == 0
+    assert not one.exists() and not two.exists() and not state.exists()
+    assert 'target=local::file.' in capsys.readouterr().out
+    assert cli.main(args) == 0
+    assert one.read_text() == 'new'
+    assert not two.exists()
+
+
+def test_target_cannot_be_used_with_reconciliation():
+    import pytest
+    with pytest.raises(SystemExit):
+        cli.parse_args(['--target', 'user.ansible', '--reconcile-state'])

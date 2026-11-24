@@ -91,7 +91,18 @@ class AuthorizedKeyOperation(Operation):
         return text
 
     def apply(self, host: HostConfig, executor: Executor) -> ActionResult:
-        record = self.manager.get_user(self.user)
+        simulated = getattr(executor, "simulated_users", {}).get(self.user) if executor.dry_run else None
+        if simulated == "absent":
+            if self.state == "absent":
+                return ActionResult(host.name, "authorized_key", False, "noop (user removal planned)")
+            raise ValueError(f"User '{self.user}' is scheduled for removal")
+        try:
+            record = self.manager.get_user(self.user)
+        except ValueError:
+            if simulated != "present":
+                raise
+            return ActionResult(host.name, "authorized_key", self.state == "present",
+                                "added (after planned user creation)" if self.state == "present" else "noop")
         ssh_dir = record.home / ".ssh"
         auth_file = ssh_dir / "authorized_keys"
 

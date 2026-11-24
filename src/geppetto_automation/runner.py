@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 class TaskRunner:
     """Coordinates the execution of automation tasks."""
 
-    def __init__(self, plan: Plan, *, dry_run: bool = False, state_store=None, progress_callback=None):
+    def __init__(self, plan: Plan, *, dry_run: bool = False, state_store=None, progress_callback=None, targets=None):
+        self.targets = targets
         self.plan = plan
         self.dry_run = dry_run
         self.state_store = state_store
@@ -22,6 +23,8 @@ class TaskRunner:
         self._executors: dict[str, Executor] = {}
 
     def run(self) -> list[ActionResult]:
+        if self.targets:
+            return self._run_targets()
         results: list[ActionResult] = []
         for task in self.plan.tasks:
             results.extend(self._run_task(task))
@@ -33,6 +36,30 @@ class TaskRunner:
                     persist=not self.dry_run,
                 )
             )
+        return results
+
+    def _run_targets(self):
+        from .targeting import select_targets
+        nodes, order, requirements = select_targets(self.plan, self.targets)
+        results = []
+        failed = set()
+        for index in order:
+            node = nodes[index]
+            host = self.plan.hosts[node.host]
+            if requirements[index] & failed:
+                failed.add(index)
+                results.append(ActionResult(node.host, node.action.type, False,
+                    "skipped: dependency failed", failed=True,
+                    resource=self._resource_name(node.action.data)))
+                continue
+            batch = self._execute_action(node.action, host, self._executor_for(host))
+            results.extend(batch)
+            if any(result.failed for result in batch):
+                failed.add(index)
+        if self.state_store:
+            # A partial apply must never garbage-collect unselected resources.
+            self.state_store.finalize(self.plan, self._executor_for,
+                                      persist=not self.dry_run, targeted=True)
         return results
 
     def _run_task(self, task: TaskSpec) -> list[ActionResult]:
@@ -48,8 +75,15 @@ class TaskRunner:
                 results.extend(self._execute_action(action, host, executor))
         return results
 
-    def _execute_action(self, action: ActionSpec, host: HostConfig, executor: Executor) -> list[ActionResult]:
+    def _execute_action(self, action: ActionSpec, host: HostConfig, executor: Executor, *, parent_target=None) -> list[ActionResult]:
         results: list[ActionResult] = []
+        name = self._resource_name(action.data)
+        address = parent_target or (f"{host.name}::{action.type}.{name}" if name else f"{host.name}::{resource_id(action)}")
+        from .targeting import aliases
+        dependencies = [dep if "::" in dep else f"{host.name}::{dep}" for dep in action.depends_on]
+        if parent_target:
+            dependencies.append(parent_target)
+        references = [f"{host.name}::{ref}" for ref in aliases(action)]
         operation_cls = OPERATION_REGISTRY.get(action.type)
         if not operation_cls:
             detail = f"unknown operation '{action.type}'"
@@ -61,9 +95,12 @@ class TaskRunner:
                 details=detail,
                 failed=True,
                 resource=self._resource_name(action.data),
+                target=address,
+                dependencies=dependencies,
+                references=references,
             )
             results.append(result)
-            results.extend(self._run_child_actions(action.on_failure, host, executor))
+            results.extend(self._run_child_actions(action.on_failure, host, executor, parent_target=address))
             return results
 
         try:
@@ -77,9 +114,12 @@ class TaskRunner:
                 details=str(exc),
                 failed=True,
                 resource=self._resource_name(action.data),
+                target=address,
+                dependencies=dependencies,
+                references=references,
             )
             results.append(result)
-            results.extend(self._run_child_actions(action.on_failure, host, executor))
+            results.extend(self._run_child_actions(action.on_failure, host, executor, parent_target=address))
             return results
 
         if self.progress_callback:
@@ -98,6 +138,9 @@ class TaskRunner:
                 details=str(exc),
                 failed=True,
                 resource=self._resource_name(action.data),
+                target=address,
+                dependencies=dependencies,
+                references=references,
             )
         else:
             if self.state_store and not result.failed:
@@ -105,22 +148,35 @@ class TaskRunner:
         logger.debug("action=%s host=%s changed=%s", action.type, host.name, result.changed)
         if result.resource is None:
             result.resource = self._resource_name(action.data)
+        result.dependencies = dependencies
+        result.references = references
+        result.target = address
         results.append(result)
 
         if not result.failed and result.changed:
-            results.extend(self._run_child_actions(action.on_success, host, executor))
+            results.extend(self._run_child_actions(action.on_success, host, executor, parent_target=address))
         elif result.failed:
-            results.extend(self._run_child_actions(action.on_failure, host, executor))
+            results.extend(self._run_child_actions(action.on_failure, host, executor, parent_target=address))
 
         return results
 
-    def _run_child_actions(self, actions: list[ActionSpec], host: HostConfig, executor: Executor) -> list[ActionResult]:
+    def _run_child_actions(self, actions: list[ActionSpec], host: HostConfig, executor: Executor, *, parent_target=None) -> list[ActionResult]:
         if not actions:
             return []
         ordered_actions = self._order_actions(actions)
         results: list[ActionResult] = []
+        failed_refs = set()
         for child in ordered_actions:
-            results.extend(self._execute_action(child, host, executor))
+            if self.targets and failed_refs.intersection(child.depends_on):
+                batch = [ActionResult(host.name, child.type, False,
+                    "skipped: dependency failed", failed=True,
+                    resource=self._resource_name(child.data), target=parent_target)]
+            else:
+                batch = self._execute_action(child, host, executor, parent_target=parent_target)
+            results.extend(batch)
+            if self.targets and any(result.failed for result in batch):
+                from .targeting import aliases
+                failed_refs.update(aliases(child))
         return results
 
     def _log_error(self, message: str, action: ActionSpec, host: HostConfig, exc: Exception) -> None:

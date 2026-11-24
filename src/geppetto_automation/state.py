@@ -93,8 +93,14 @@ class StateStore:
                 ]
         return migrated
 
-    def finalize(self, plan, executor_factory, *, persist: bool = True) -> list[ActionResult]:
+    def finalize(self, plan, executor_factory, *, persist: bool = True, targeted: bool = False) -> list[ActionResult]:
         results: list[ActionResult] = []
+        if targeted:
+            for host, entries in self.previous.items():
+                self.current[host] = {**entries, **self.current.get(host, {})}
+            if persist:
+                self._write()
+            return results
         desired = {}
         for host_name, action in plan_actions(plan):
             for item in state_actions(action):

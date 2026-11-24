@@ -68,6 +68,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=Path("/etc/geppetto/main.conf"),
         help="Path to geppetto config file (default: /etc/geppetto/main.conf)",
     )
+    parser.add_argument("--target", action="append", default=[], metavar="[HOST::]TYPE.NAME",
+                        help="Apply only a resource and its dependencies; repeat to select multiple resources")
     parser.add_argument("--reconcile-state", action="store_true",
                         help="Reconcile tracked resources with live existence; never apply or clean up resources")
     sync_options = parser.add_mutually_exclusive_group()
@@ -87,7 +89,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Show installed version and exit",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.target and args.reconcile_state:
+        parser.error("--target cannot be combined with --reconcile-state")
+    return args
 
 
 def parse_cert_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -208,7 +213,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         dry_run=args.dry_run,
         state_store=state_store,
         progress_callback=print_progress,
+        targets=args.target,
     )
+    if args.target:
+        print("Targeted run: selected resources, required dependencies and conditional hooks only; automatic cleanup disabled.")
     try:
         results = (reconcile_state(plan, state_store, dry_run=args.dry_run)
                    if args.reconcile_state else runner.run())
@@ -221,20 +229,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     effective_level = logging.getLogger().getEffectiveLevel()
     summary = Summary()
-    for result in results:
+    depths, context = dry_run_layout(results) if args.dry_run and not args.reconcile_state else ({}, set())
+    for index, result in enumerate(results):
         _clear_progress()
         summary.add(result)
         log_result(result)
-        if not args.reconcile_state and not should_display_result(result, effective_level):
+        if not args.reconcile_state and index not in context and not should_display_result(result, effective_level):
             continue
-        print(format_result(result))
+        print(format_result(result, dry_run=args.dry_run and not args.reconcile_state,
+                            depth=depths.get(index, 0)))
 
     _clear_progress()
     print(summary.render())
     if args.reconcile_state:
         print(f"State reconciliation {'preview (no files written)' if args.dry_run else 'saved (previous state backed up)'}: {state_path}")
 
-    return 0
+    return 1 if args.target and any(result.failed for result in results) else 0
 
 
 def import_main(argv: Sequence[str]) -> int:
@@ -284,7 +294,37 @@ def cert_main(argv: Sequence[str]) -> int:
     return 1
 
 
-def format_result(result: ActionResult) -> str:
+def dry_run_layout(results):
+    """Indent declared prerequisites and keep unchanged ancestors visible."""
+    refs = {}
+    for index, result in enumerate(results):
+        for ref in result.references:
+            refs.setdefault(ref, index)
+    edges = {index: {refs[dep] for dep in result.dependencies if dep in refs and refs[dep] != index}
+             for index, result in enumerate(results)}
+    depths = {}
+    def depth(index, active):
+        if index in active:
+            return 0
+        if index not in depths:
+            depths[index] = max((depth(parent, active | {index}) + 1 for parent in edges[index]), default=0)
+        return depths[index]
+    for index in edges:
+        depth(index, set())
+    context = set()
+    def include(index):
+        if index in context:
+            return
+        context.add(index)
+        for parent in edges[index]:
+            include(parent)
+    for index, result in enumerate(results):
+        if result.changed or result.failed:
+            include(index)
+    return depths, context
+
+
+def format_result(result: ActionResult, *, dry_run=False, depth=0) -> str:
     status = "changed" if result.changed else "ok"
     color: Optional[str] = None
     if result.failed:
@@ -302,6 +342,12 @@ def format_result(result: ActionResult) -> str:
         color = Ansi.BLUE
     resource = f"[{result.resource}]" if result.resource else ""
     line = f"{result.host}::{result.action}{resource} {status} - {result.details}"
+    if result.target:
+        line += f" (target={result.target})"
+    if dry_run and result.dependencies:
+        labels = [dep.split("::", 1)[-1] for dep in result.dependencies]
+        line += " (depends on: " + ", ".join(dict.fromkeys(labels)) + ")"
+        line = "  " * max(depth - 1, 0) + "\\_ " + line
     return colorize(line, color)
 
 

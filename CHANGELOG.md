@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.8
+
+### Fixed
+- Dry-run user creation is shared with later authorized-key previews, preventing
+  false missing-user failures without creating real accounts or writing keys.
+
+### Added
+- Dry-run results show dependency indentation (`\_`) and explicit prerequisite
+  labels, including unchanged prerequisites needed to understand changed resources.
+  Live-run formatting remains unchanged.
+- Repeatable `--target [HOST::]TYPE.NAME` selects individual resources and their
+  transitive declared dependencies, including across tasks. Unknown, ambiguous,
+  cyclic or missing dependencies fail before any selected resource is applied.
+- Target individual members of package lists by package name. Selected members
+  from one package block execute together and trigger its hooks once.
+- Targeted runs skip dependents after prerequisite failure, preserve unselected
+  tracking and disable automatic cleanup. Combine with `--dry-run` for preview.
+- Resource results display a copyable target address; hooks display their parent
+  target and retain their normal conditional behavior.
+
 ## 0.3.7
 
 ### Added

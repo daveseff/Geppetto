@@ -42,3 +42,6 @@ class ActionResult:
     details: str
     failed: bool = False
     resource: Optional[str] = None
+    target: Optional[str] = None
+    dependencies: list[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
