@@ -136,12 +136,21 @@ def parse_import_args(argv: Sequence[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+class ConsoleFormatter(logging.Formatter):
+    def format(self, record):
+        return getattr(record, "dependency_indent", "") + super().format(record)
+
+
+def dependency_indent(result, *, dry_run=False, depth=0):
+    return "    " * max(depth, 1) if dry_run and result.dependencies else ""
+
+
 def configure_logging(level: str, *, log_file: Optional[Path]) -> None:
     log_level = getattr(logging, level.upper(), logging.INFO)
     handlers: list[logging.Handler] = []
     stream = logging.StreamHandler()
     stream.setLevel(log_level)
-    stream.setFormatter(logging.Formatter("%(levelname)s %(name)s - %(message)s"))
+    stream.setFormatter(ConsoleFormatter("%(levelname)s %(name)s - %(message)s"))
     handlers.append(stream)
 
     if log_file:
@@ -233,7 +242,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for index, result in enumerate(results):
         _clear_progress()
         summary.add(result)
-        log_result(result)
+        log_result(result, dry_run=args.dry_run and not args.reconcile_state,
+                   depth=depths.get(index, 0))
         if not args.reconcile_state and index not in context and not should_display_result(result, effective_level):
             continue
         print(format_result(result, dry_run=args.dry_run and not args.reconcile_state,
@@ -347,11 +357,12 @@ def format_result(result: ActionResult, *, dry_run=False, depth=0) -> str:
     if dry_run and result.dependencies:
         labels = [dep.split("::", 1)[-1] for dep in result.dependencies]
         line += " (depends on: " + ", ".join(dict.fromkeys(labels)) + ")"
-        line = "  " * max(depth - 1, 0) + "\\_ " + line
+        line = dependency_indent(result, dry_run=dry_run, depth=depth) + '\\_ ' + line
     return colorize(line, color)
 
 
-def log_result(result: ActionResult) -> None:
+def log_result(result: ActionResult, *, dry_run=False, depth=0) -> None:
+    extra = {"dependency_indent": dependency_indent(result, dry_run=dry_run, depth=depth)}
     logger = logging.getLogger("geppetto")
     if result.failed:
         logger.error(
@@ -360,6 +371,7 @@ def log_result(result: ActionResult) -> None:
             result.action,
             result.resource,
             result.details,
+            extra=extra,
         )
         return
     if result.changed:
@@ -370,6 +382,7 @@ def log_result(result: ActionResult) -> None:
             result.resource,
             result.changed,
             result.details,
+            extra=extra,
         )
         return
     logger.debug(
@@ -379,6 +392,7 @@ def log_result(result: ActionResult) -> None:
         result.resource,
         result.changed,
         result.details,
+        extra=extra,
     )
 
 

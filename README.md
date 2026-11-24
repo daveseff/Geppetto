@@ -269,7 +269,8 @@ If the loader detects a `.fops` extension (or the DSL syntax), it automatically 
 
 The CLI returns zero on success and prints a concise status line per host/action pair. If you provide no path argument the runner defaults to `/etc/geppetto/plan.fops`, and relative template references resolve beneath `/etc/geppetto` (or whatever directory the plan lives in). Each run also maintains a state file (`plan.fops.state.json` by default) so that removing a resource from the plan automatically triggers the appropriate teardown (file removal, user deletion, unmounts, etc.). You can override the state location via `--state-file`. Dry-runs read this state and preview those teardown actions, but never update the state file or the managed resources. Sequential crontab changes are simulated in memory so their dry-run results match apply ordering.
 
-Dry-run results indent dependent resources with `\_` and label their declared
+Dry-run results indent dependent resources four spaces per level, along with
+their matching console log lines, using `\_` and label their declared
 prerequisites. Unchanged prerequisites remain visible when a dependent resource
 has changes. Indentation reflects dependency depth; the labels identify every
 prerequisite when a resource has more than one. Live runs keep their flat output.
@@ -279,8 +280,8 @@ For a user followed by dependent keys, the preview includes:
 
 ```text
 prd-hvr-agent::user[ansible] changed - created
-\_ prd-hvr-agent::authorized_key[ansible-exec] changed - added (after planned user creation) ... (depends on: user.ansible)
-\_ prd-hvr-agent::authorized_key[ansible-management] changed - added (after planned user creation) ... (depends on: user.ansible)
+    \_ prd-hvr-agent::authorized_key[ansible-exec] changed - added (after planned user creation) ... (depends on: user.ansible)
+    \_ prd-hvr-agent::authorized_key[ansible-management] changed - added (after planned user creation) ... (depends on: user.ansible)
 ```
 
 Successful simulated user creation is shared with later key resources on the

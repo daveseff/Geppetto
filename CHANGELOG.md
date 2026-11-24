@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 This project does not yet backfill historical releases. Entries start at the
 point the changelog was introduced.
 
+## 0.3.9
+
+### Changed
+- Indent dry-run dependency branches four spaces per level, including the matching
+  console log lines. Live output and persistent log formatting are unchanged.
+
 ## 0.3.8
 
 ### Fixed

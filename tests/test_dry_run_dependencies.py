@@ -29,7 +29,7 @@ def test_user_creation_is_simulated_for_both_dependent_keys(monkeypatch):
     depths, context = dry_run_layout(results)
     assert depths == {0: 0, 1: 1, 2: 1}
     assert context == {0, 1, 2}
-    assert format_result(results[1], dry_run=True, depth=depths[1]).startswith('\\_ ')
+    assert format_result(results[1], dry_run=True, depth=depths[1]).startswith('    \\_ ')
     assert 'depends on: user.ansible' in format_result(results[1], dry_run=True, depth=1)
     assert not format_result(results[1]).startswith('\\_ ')
     assert 'depends on:' not in format_result(results[1])
@@ -66,7 +66,7 @@ def test_layout_keeps_noop_prerequisites_and_shows_transitive_depth():
     depths, context = dry_run_layout(results)
     assert depths == {0: 0, 1: 1, 2: 2, 3: 0}
     assert context == {0, 1, 2}
-    assert format_result(results[2], dry_run=True, depth=2).startswith('  \\_ ')
+    assert format_result(results[2], dry_run=True, depth=2).startswith('        \\_ ')
 
 
 def test_layout_handles_multiple_prerequisites_and_cycles():
